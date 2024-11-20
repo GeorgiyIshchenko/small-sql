@@ -2,7 +2,7 @@
 
 #include "Column.hpp"
 
-#include <any>
+#include <functional>
 #include <map>
 #include <memory>
 #include <string>
@@ -20,7 +20,7 @@ class Table final
 
         struct Row
         {
-            columns::FieldTypes type;
+            columns::ColumTypes type;
             size_t size;
             columns::BaseColumn::value_type rowData;
         };
@@ -33,16 +33,25 @@ class Table final
         std::vector<Row> rows = {};
     };
 
+public:
+
     using ColumnType = std::shared_ptr<columns::BaseColumn>;
 
-    using Index =
+    using OrderedIndex =
         std::multimap<columns::BaseColumn::value_type, std::shared_ptr<Record>>;
 
-public:
-    using id_type = int;
+    using InsertType = std::map<std::string, columns::BaseColumn::value_type>;
+
+    using QueryType = std::vector<Record>;
+
+    using FilterFunction = std::function<QueryType(QueryType&)>;
 
 public:
-    Table(std::string name, std::vector<ColumnType> values);
+    using value_type = columns::BaseColumn::value_type;
+
+public:
+
+    Table(const std::string& name, std::vector<ColumnType>& columns);
 
 public:
     std::vector<ColumnType> getColumns() const
@@ -66,25 +75,37 @@ public:
     };
 
 public:
-    void insert(std::map<std::string, columns::BaseColumn::value_type>);
+    void insert(InsertType);
 
+    Table select(std::vector<std::string>&,
+                 FilterFunction);
 
+    void del(FilterFunction);
 
 private:
-    constexpr static uint64_t id_ = 0;
-    std::string name_;
+    // Helpers
+    void insertImpl(Record);
+    void validateInsertion(InsertType&);
+    Record createRecord(InsertType&);
+    void validateRecord(Record& newRecord);
+    void createIndexes(std::shared_ptr<Record>);
+
+private:
+    std::string tableName_;
 
     std::vector<ColumnType> columns_{};
     ColumnType keyColumn_;
     std::vector<ColumnType> uniquieColumns_{};
     std::vector<ColumnType> indexColumns_{};
+    std::unordered_map<std::string, columns::Integer::value_type>
+        autoIncrementColumnsMap_{};
 
     // std::string parameter is a name of a field
     std::unordered_map<std::string, ColumnType> columnMap_;
     std::unordered_map<std::string, size_t> recordMapping_;
-    std::unordered_map<std::string, Index> indexes_;
+    std::unordered_map<std::string, OrderedIndex> orderedIndexes_;
 
-    std::vector<Record> records_{};
+    QueryType records_{};
 };
 
 class TableException : public std::exception

@@ -10,9 +10,17 @@
 
 namespace db
 {
-
 namespace columns
 {
+
+enum class ColumTypes : u_char
+{
+    Integer,
+    Id,
+    Bool,
+    String,
+    Bytes,
+};
 
 class BaseColumn
 {
@@ -22,7 +30,7 @@ public:
 
 public:
     BaseColumn(const std::string& name, value_type defaultValue = {},
-              bool index = false, bool unique = false, bool key = false)
+               bool index = false, bool unique = false, bool key = false)
         : name_(name), defaultValue_(defaultValue), index_(index), key_(key)
     {
         unique_ = key ? true : unique;
@@ -55,6 +63,13 @@ public:
         return index_;
     }
 
+    virtual ColumTypes getColumnType() const = 0;
+
+    virtual bool isAutoIncrement() const
+    {
+        return false;
+    }
+
     virtual size_t getValueSize() = 0;
 
 protected:
@@ -80,7 +95,12 @@ public:
     }
 
 public:
-    bool isAutoIncrement() const
+    ColumTypes getColumnType() const override
+    {
+        return ColumTypes::Integer;
+    }
+
+    bool isAutoIncrement() const override
     {
         return autoIncrement_;
     }
@@ -102,9 +122,14 @@ public:
         : Integer("id", 0, true, true, true, true)
     {
     }
+
+    ColumTypes getColumnType() const override
+    {
+        return ColumTypes::Id;
+    }
 };
 
-class Bool : public BaseColumn
+class Bool final : public BaseColumn
 {
 
 public:
@@ -115,13 +140,18 @@ public:
          bool unique = false, bool key = false)
         : BaseColumn(name, defaultValue, index, unique, key) {};
 
+    ColumTypes getColumnType() const override
+    {
+        return ColumTypes::Integer;
+    }
+
     size_t getValueSize() override
     {
         return sizeof(value_type);
     };
 };
 
-class String : public BaseColumn
+class String final : public BaseColumn
 {
 
 public:
@@ -133,6 +163,11 @@ public:
            bool unique = false, bool key = false)
         : BaseColumn(name, defaultValue, index, unique, key), maxLen_(maxLen)
     {
+    }
+
+    ColumTypes getColumnType() const override
+    {
+        return ColumTypes::String;
     }
 
     size_t getValueSize() override
@@ -150,7 +185,7 @@ private:
     size_t maxLen_;
 };
 
-class Bytes : public BaseColumn
+class Bytes final : public BaseColumn
 {
 
 public:
@@ -164,6 +199,11 @@ public:
     {
     }
 
+    ColumTypes getColumnType() const override
+    {
+        return ColumTypes::Bytes;
+    }
+
     size_t getValueSize() override
     {
         return maxLen_;
@@ -171,15 +211,6 @@ public:
 
 private:
     size_t maxLen_;
-};
-
-enum class FieldTypes : u_char
-{
-    Integer,
-    Id,
-    Bool,
-    String,
-    Bytes,
 };
 
 } // namespace columns
