@@ -11,28 +11,28 @@
 namespace db
 {
 
-namespace fieldset
+namespace columns
 {
 
-class BaseField
+class BaseColumn
 {
 
 public:
     using value_type = std::variant<bool, int, std::string, std::vector<char>>;
 
 public:
-    BaseField(const std::string& name, value_type defaultValue = {},
-              bool unique = false, bool key = false)
-        : name_(name), defaultValue_(defaultValue), key_(key)
+    BaseColumn(const std::string& name, value_type defaultValue = {},
+              bool index = false, bool unique = false, bool key = false)
+        : name_(name), defaultValue_(defaultValue), index_(index), key_(key)
     {
         unique_ = key ? true : unique;
     }
 
-    BaseField(const BaseField&) = default;
+    BaseColumn(const BaseColumn&) = default;
 
-    BaseField(BaseField&&) = default;
+    BaseColumn(BaseColumn&&) = default;
 
-    virtual ~BaseField() = default;
+    virtual ~BaseColumn() = default;
 
 public:
     const std::string& name() const
@@ -50,6 +50,11 @@ public:
         return key_;
     }
 
+    bool isIndex() const
+    {
+        return index_;
+    }
+
     virtual size_t getValueSize() = 0;
 
 protected:
@@ -57,18 +62,19 @@ protected:
     std::optional<value_type> defaultValue_;
     bool unique_;
     bool key_;
+    bool index_;
 };
 
-class Integer : public BaseField
+class Integer : public BaseColumn
 {
 
 public:
     using value_type = int;
 
 public:
-    Integer(const std::string& name, int defaultValue = {}, bool unique = false,
-            bool key = false, bool autoIncrement = false)
-        : BaseField(name, defaultValue, unique, key),
+    Integer(const std::string& name, int defaultValue = {}, bool index = false,
+            bool unique = false, bool key = false, bool autoIncrement = false)
+        : BaseColumn(name, defaultValue, index, unique, key),
           autoIncrement_(autoIncrement)
     {
     }
@@ -93,21 +99,21 @@ class Id final : public Integer
 
 public:
     Id()
-        : Integer("id", 0, true, true, true)
+        : Integer("id", 0, true, true, true, true)
     {
     }
 };
 
-class Bool : public BaseField
+class Bool : public BaseColumn
 {
 
 public:
     using value_type = bool;
 
 public:
-    Bool(const std::string& name, bool defaultValue = {}, bool unique = false,
-         bool key = false)
-        : BaseField(name, defaultValue, unique, key) {};
+    Bool(const std::string& name, bool defaultValue = {}, bool index = false,
+         bool unique = false, bool key = false)
+        : BaseColumn(name, defaultValue, index, unique, key) {};
 
     size_t getValueSize() override
     {
@@ -115,7 +121,7 @@ public:
     };
 };
 
-class String : public BaseField
+class String : public BaseColumn
 {
 
 public:
@@ -123,8 +129,9 @@ public:
 
 public:
     String(const std::string& name, size_t maxLen,
-           std::string defaultValue = {}, bool unique = false, bool key = false)
-        : BaseField(name, defaultValue, unique, key), maxLen_(maxLen)
+           std::string defaultValue = {}, bool index = false,
+           bool unique = false, bool key = false)
+        : BaseColumn(name, defaultValue, index, unique, key), maxLen_(maxLen)
     {
     }
 
@@ -143,7 +150,7 @@ private:
     size_t maxLen_;
 };
 
-class Bytes : public BaseField
+class Bytes : public BaseColumn
 {
 
 public:
@@ -151,9 +158,9 @@ public:
 
 public:
     Bytes(const std::string& name, size_t maxLen,
-          std::vector<char> defaultValue = {}, bool unique = false,
-          bool key = false)
-        : BaseField(name, defaultValue, unique, key), maxLen_(maxLen)
+          std::vector<char> defaultValue = {}, bool index = false,
+          bool unique = false, bool key = false)
+        : BaseColumn(name, defaultValue, index, unique, key), maxLen_(maxLen)
     {
     }
 
@@ -166,7 +173,7 @@ private:
     size_t maxLen_;
 };
 
-enum class FieldTypes : char
+enum class FieldTypes : u_char
 {
     Integer,
     Id,
@@ -175,6 +182,6 @@ enum class FieldTypes : char
     Bytes,
 };
 
-} // namespace fieldset
+} // namespace columns
 
 } // namespace db

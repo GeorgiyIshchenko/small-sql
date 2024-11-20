@@ -1,11 +1,12 @@
 #pragma once
 
-#include "Field.hpp"
+#include "Column.hpp"
 
 #include <any>
 #include <map>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace db
@@ -19,64 +20,71 @@ class Table final
 
         struct Row
         {
-            fieldset::FieldTypes type;
+            columns::FieldTypes type;
             size_t size;
-            std::any rowData;
+            columns::BaseColumn::value_type rowData;
         };
 
         Record(size_t recordListSize)
         {
-            recordList.resize(recordListSize);
+            rows.resize(recordListSize);
         }
 
-        std::vector<std::unique_ptr<Row>> recordList = {};
-
+        std::vector<Row> rows = {};
     };
 
-    using FieldType = std::shared_ptr<fieldset::BaseField>;
+    using ColumnType = std::shared_ptr<columns::BaseColumn>;
 
     using Index =
-        std::map<fieldset::BaseField::value_type, std::shared_ptr<Record>>;
+        std::multimap<columns::BaseColumn::value_type, std::shared_ptr<Record>>;
 
 public:
     using id_type = int;
 
 public:
-    Table(std::string name, std::vector<FieldType> fields);
+    Table(std::string name, std::vector<ColumnType> values);
 
 public:
-    std::vector<FieldType> getFields() const
+    std::vector<ColumnType> getColumns() const
     {
-        return fields_;
+        return columns_;
     }
 
-    std::vector<FieldType> getUniqueFields() const
+    std::vector<ColumnType> getUniqueColumns() const
     {
-        return uniquieFields_;
+        return uniquieColumns_;
     };
 
-    FieldType getKeyField() const
+    std::vector<ColumnType> getInndexColumns() const
     {
-        return keyField_;
+        return indexColumns_;
+    };
+
+    ColumnType getKeyField() const
+    {
+        return keyColumn_;
     };
 
 public:
-    void insert(std::map<std::string, fieldset::BaseField::value_type>);
+    void insert(std::map<std::string, columns::BaseColumn::value_type>);
+
+
 
 private:
     constexpr static uint64_t id_ = 0;
     std::string name_;
 
-    std::vector<FieldType> fields_{};
-    FieldType keyField_;
-    std::vector<FieldType> uniquieFields_{};
+    std::vector<ColumnType> columns_{};
+    ColumnType keyColumn_;
+    std::vector<ColumnType> uniquieColumns_{};
+    std::vector<ColumnType> indexColumns_{};
 
     // std::string parameter is a name of a field
-    std::map<std::string, FieldType> fieldMap_;
-    std::map<std::string, size_t> recordMapping_;
-    std::map<std::string, Index> indexes_;
+    std::unordered_map<std::string, ColumnType> columnMap_;
+    std::unordered_map<std::string, size_t> recordMapping_;
+    std::unordered_map<std::string, Index> indexes_;
 
-    std::vector<Record>* records_{};
+    std::vector<Record> records_{};
 };
 
 class TableException : public std::exception
