@@ -2,7 +2,9 @@
 
 #include "Column.hpp"
 
+#include <filesystem>
 #include <functional>
+#include <list>
 #include <map>
 #include <memory>
 #include <string>
@@ -20,7 +22,7 @@ class Table final
 
         struct Row
         {
-            columns::ColumTypes type;
+            columns::ColumType type;
             size_t size;
             columns::BaseColumn::value_type rowData;
         };
@@ -34,7 +36,6 @@ class Table final
     };
 
 public:
-
     using ColumnType = std::shared_ptr<columns::BaseColumn>;
 
     using OrderedIndex =
@@ -42,7 +43,7 @@ public:
 
     using InsertType = std::map<std::string, columns::BaseColumn::value_type>;
 
-    using QueryType = std::vector<Record>;
+    using QueryType = std::list<Record>;
 
     using FilterFunction = std::function<QueryType(QueryType&)>;
 
@@ -50,11 +51,10 @@ public:
     using value_type = columns::BaseColumn::value_type;
 
 public:
-
     Table(const std::string& name, std::vector<ColumnType>& columns);
 
 public:
-    std::vector<ColumnType> getColumns() const
+    std::list<ColumnType> getColumns() const
     {
         return columns_;
     }
@@ -75,12 +75,11 @@ public:
     };
 
 public:
-    void insert(InsertType);
+    void insert(InsertType& insertMap);
 
-    Table select(std::vector<std::string>&,
-                 FilterFunction);
+    Table select(std::vector<std::string>&, FilterFunction& filter);
 
-    void del(FilterFunction);
+    void del(FilterFunction& filter);
 
 private:
     // Helpers
@@ -90,13 +89,18 @@ private:
     void validateRecord(Record& newRecord);
     void createIndexes(std::shared_ptr<Record>);
 
+public:
+    void serialize(std::filesystem::path dataFilePath);
+    void deserialize(std::filesystem::path dataFilePath);
+
 private:
     std::string tableName_;
 
-    std::vector<ColumnType> columns_{};
+    std::list<ColumnType> columns_{};
     ColumnType keyColumn_;
     std::vector<ColumnType> uniquieColumns_{};
     std::vector<ColumnType> indexColumns_{};
+    std::vector<ColumnType> defaultColumns_{};
     std::unordered_map<std::string, columns::Integer::value_type>
         autoIncrementColumnsMap_{};
 

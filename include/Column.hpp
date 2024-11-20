@@ -2,6 +2,8 @@
 
 #include <cassert>
 #include <cstddef>
+#include <fstream>
+#include <memory>
 #include <optional>
 #include <string>
 #include <sys/types.h>
@@ -13,14 +15,21 @@ namespace db
 namespace columns
 {
 
-enum class ColumTypes : u_char
+enum class ColumType : u_char
 {
-    Integer,
-    Id,
-    Bool,
-    String,
-    Bytes,
+    None = 0,
+    Integer = 1, // Explicit declaration for deserialization
+    Id = 2,
+    Bool = 3,
+    String = 4,
+    Bytes = 5,
 };
+
+class BaseColumn;
+
+void serialize(std::ofstream& file, std::shared_ptr<BaseColumn> column);
+
+std::shared_ptr<BaseColumn> deserialize(std::ifstream& file);
 
 class BaseColumn
 {
@@ -63,7 +72,17 @@ public:
         return index_;
     }
 
-    virtual ColumTypes getColumnType() const = 0;
+    bool hasDefault() const
+    {
+        return defaultValue_.has_value();
+    }
+
+    value_type getDefaultValue() const
+    {
+        return defaultValue_.value();
+    }
+
+    virtual ColumType getColumnType() const = 0;
 
     virtual bool isAutoIncrement() const
     {
@@ -71,6 +90,32 @@ public:
     }
 
     virtual size_t getValueSize() = 0;
+
+    friend void columns::serialize(std::ofstream &file, std::shared_ptr<BaseColumn> column);
+
+    friend std::shared_ptr<BaseColumn> columns::deserialize(std::ifstream &file);
+
+public:
+    static ColumType getValueColumnType(value_type value)
+    {
+        if (std::holds_alternative<bool>(value))
+        {
+            return columns::ColumType::Bool;
+        }
+        if (std::holds_alternative<int>(value))
+        {
+            return columns::ColumType::Integer;
+        }
+        if (std::holds_alternative<std::string>(value))
+        {
+            return columns::ColumType::String;
+        }
+        if (std::holds_alternative<std::vector<char>>(value))
+        {
+            return columns::ColumType::Bytes;
+        }
+        return ColumType::None;
+    };
 
 protected:
     std::string name_;
@@ -95,9 +140,9 @@ public:
     }
 
 public:
-    ColumTypes getColumnType() const override
+    ColumType getColumnType() const override
     {
-        return ColumTypes::Integer;
+        return ColumType::Integer;
     }
 
     bool isAutoIncrement() const override
@@ -123,9 +168,9 @@ public:
     {
     }
 
-    ColumTypes getColumnType() const override
+    ColumType getColumnType() const override
     {
-        return ColumTypes::Id;
+        return ColumType::Id;
     }
 };
 
@@ -140,9 +185,9 @@ public:
          bool unique = false, bool key = false)
         : BaseColumn(name, defaultValue, index, unique, key) {};
 
-    ColumTypes getColumnType() const override
+    ColumType getColumnType() const override
     {
-        return ColumTypes::Integer;
+        return ColumType::Integer;
     }
 
     size_t getValueSize() override
@@ -165,9 +210,9 @@ public:
     {
     }
 
-    ColumTypes getColumnType() const override
+    ColumType getColumnType() const override
     {
-        return ColumTypes::String;
+        return ColumType::String;
     }
 
     size_t getValueSize() override
@@ -199,9 +244,9 @@ public:
     {
     }
 
-    ColumTypes getColumnType() const override
+    ColumType getColumnType() const override
     {
-        return ColumTypes::Bytes;
+        return ColumType::Bytes;
     }
 
     size_t getValueSize() override

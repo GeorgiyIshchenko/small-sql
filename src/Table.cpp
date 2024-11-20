@@ -2,6 +2,8 @@
 #include "Column.hpp"
 
 #include <algorithm>
+#include <filesystem>
+#include <fstream>
 #include <memory>
 #include <ranges>
 #include <string>
@@ -33,6 +35,10 @@ db::Table::Table(const std::string& name, std::vector<ColumnType>& values)
         {
             autoIncrementColumnsMap_[column->name()] = 0;
         }
+        if (column->hasDefault())
+        {
+            defaultColumns_.push_back(column);
+        }
     }
     if (uniquieColumns_.empty())
     {
@@ -46,6 +52,13 @@ db::Table::Table(const std::string& name, std::vector<ColumnType>& values)
 
 void db::Table::validateInsertion(InsertType& mappedRecord)
 {
+    if (mappedRecord.size() != columnMap_.size())
+    {
+        throw TableException("Insert " + tableName_ +
+                             ": Invalid amount of fields: " +
+                             std::to_string(mappedRecord.size()) + "/" +
+                             std::to_string(columnMap_.size()) + "!");
+    }
     Record newRecord{ columns_.size() };
     for (auto&& [name, value] : mappedRecord)
     {
@@ -68,25 +81,23 @@ void db::Table::validateInsertion(InsertType& mappedRecord)
 db::Table::Record db::Table::createRecord(InsertType& mappedRecord)
 {
     Record newRecord{ columns_.size() };
+
+    // Firstly, construct default object
+
+    for (auto&& column : defaultColumns_)
+    {
+        Record::Row newRow;
+        newRow.type = column->getColumnType();
+        newRow.size = column->getValueSize();
+        newRow.rowData = column->getDefaultValue();
+    }
+
+    // Rewrite defaults with existing values
+
     for (auto&& [name, value] : mappedRecord)
     {
         Record::Row newRow;
-        if (std::holds_alternative<bool>(value))
-        {
-            newRow.type = columns::ColumTypes::Bool;
-        }
-        else if (std::holds_alternative<int>(value))
-        {
-            newRow.type = columns::ColumTypes::Integer;
-        }
-        else if (std::holds_alternative<std::string>(value))
-        {
-            newRow.type = columns::ColumTypes::String;
-        }
-        else if (std::holds_alternative<std::vector<char>>(value))
-        {
-            newRow.type = columns::ColumTypes::Bytes;
-        }
+        newRow.type = columns::BaseColumn::getValueColumnType(value);
         newRow.size = columnMap_[name]->getValueSize();
         newRow.rowData = value;
         newRecord.rows[recordMapping_[name]] = newRow;
@@ -138,12 +149,12 @@ void db::Table::insertImpl(Record newRecord)
 
     // Make indexes
     auto sharedNewRecord =
-        std::make_shared<Record>(records_[records_.size() - 1]);
+        std::make_shared<Record>(records_.back());
 
     createIndexes(sharedNewRecord);
 }
 
-void db::Table::insert(InsertType mappedRecord)
+void db::Table::insert(InsertType& mappedRecord)
 {
     auto newRecord = createRecord(mappedRecord);
 
@@ -153,7 +164,7 @@ void db::Table::insert(InsertType mappedRecord)
 };
 
 db::Table db::Table::select(std::vector<std::string>& column_names,
-                            FilterFunction filter)
+                            FilterFunction& filter)
 {
     std::vector<ColumnType> selectedColumns;
     std::for_each(column_names.begin(), column_names.end(),
@@ -185,9 +196,30 @@ db::Table db::Table::select(std::vector<std::string>& column_names,
     return result;
 }
 
-void db::Table::del(FilterFunction filter)
+void db::Table::del(FilterFunction& filter)
 {
+    // NOTE: Should delete in filter function for perfomance
     QueryType recordsToDelete = filter(records_);
+}
+
+void db::Table::serialize(std::filesystem::path dataFilePath)
+{
+    std::ofstream outputFile{ dataFilePath.native() };
+    if (outputFile.is_open())
+    {
+        outputFile << columns_.size(); // Number of columns
+        for(auto&& column: columns_){
+            columns::serialize(outputFile, column);
+        }
+        outputFile << static_cast<int>(columns::ColumType::None); // We dont have zero column type, so zero is used as border
 
 
+
+        outputFile << records_.size(); // Size of our table
+        outputFile.close();
+    }
+}
+
+void db::Table::deserialize(std::filesystem::path dataFilePath)
+{
 }
