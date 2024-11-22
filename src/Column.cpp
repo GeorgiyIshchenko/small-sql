@@ -114,9 +114,10 @@ db::columns::deserialize(std::ifstream& file)
             defaultValue = str;
         }
     }
+    // TODO: !!!
     if (type == columns::ColumType::Integer)
     {
-        return Integer(name, std::get<Integer::value_type>(defaultValue.value()), isIndex, isUnique, isKey, isAutoIncrement);
+    
     }
     else if (type == columns::ColumType::Id)
     {

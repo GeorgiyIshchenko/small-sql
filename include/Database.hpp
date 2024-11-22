@@ -2,6 +2,7 @@
 
 #include "Table.hpp"
 
+#include <memory>
 #include <string>
 #include <unordered_map>
 
@@ -12,30 +13,39 @@ class Database
 {
 
 public:
+
+    using TablesContainer = std::unordered_map<std::string, std::shared_ptr<Table>>;
+
+private:
     Database() = default;
 
+    ~Database() = default;
+
+public:
+    Database(const Database& other) = delete;
+    Database& operator=(const Database& other) = delete;
+
+    static Database& getInstance(){
+        static Database instance;
+        return instance;
+    }
+
+public:
+
+    TablesContainer getTables() const {
+        return tables_;
+    }
+
+public:
     void createTable(const std::string& name,
                      std::vector<Table::ColumnType>& columns)
     {
-        Table newTable{ name, columns };
-        tables_[name] = newTable;
-    }
-
-    void insert(const std::string& name, Table::InsertType& insertMap)
-    {
-        tables_[name].insert(insertMap);
-    }
-
-    Table select(const std::string& name, std::vector<std::string>& colum_names, Table::FilterFunction& filter){
-        return tables_[name].select(colum_names, filter);
-    }
-
-    void del(const std::string& name, Table::FilterFunction& filter){
-        tables_[name].del(filter);
+        Table* newTable = new Table(name, columns);
+        tables_[name] = std::make_shared<Table>(newTable);
     }
 
 private:
-    std::unordered_map<std::string, Table> tables_;
+    TablesContainer tables_;
 };
 
 } // namespace db

@@ -148,8 +148,7 @@ void db::Table::insertImpl(Record newRecord)
     records_.push_back(std::move(newRecord));
 
     // Make indexes
-    auto sharedNewRecord =
-        std::make_shared<Record>(records_.back());
+    auto sharedNewRecord = std::make_shared<Record>(records_.back());
 
     createIndexes(sharedNewRecord);
 }
@@ -163,8 +162,9 @@ void db::Table::insert(InsertType& mappedRecord)
     insertImpl(std::move(newRecord));
 };
 
-db::Table db::Table::select(std::vector<std::string>& column_names,
-                            FilterFunction& filter)
+db::Table::SingleSelectResult
+db::Table::select(std::vector<std::string>& column_names,
+                  db::Table::Filter& filter)
 {
     std::vector<ColumnType> selectedColumns;
     std::for_each(column_names.begin(), column_names.end(),
@@ -179,27 +179,34 @@ db::Table db::Table::select(std::vector<std::string>& column_names,
                       }
                       selectedColumns.push_back(it->second);
                   });
-    Table result{ "ST_" + tableName_, selectedColumns };
-    QueryType newRecords = filter(records_);
 
-    for (auto record : newRecords)
+    SingleSelectResult result{};
+
+    if (orderedIndexes_.count(filter.columnName_))
     {
-        Record newRecord{ selectedColumns.size() };
-        for (auto column : selectedColumns)
+        // TODO
+    }
+    else
+    {
+        for (auto&& record : records_)
         {
-            Record::Row newRow = record.rows[recordMapping_[column->name()]];
-            newRecord.rows[result.recordMapping_[column->name()]] = newRow;
+            if (filter.lowerBound_ <
+                    record.rows[recordMapping_[filter.columnName_]].rowData &&
+                record.rows[recordMapping_[filter.columnName_]].rowData <=
+                    filter.upperBound_)
+            {
+                result.push_back(std::make_shared<Record>(record));
+            }
         }
-        result.insertImpl(std::move(newRecord));
     }
 
     return result;
 }
 
-void db::Table::del(FilterFunction& filter)
+void db::Table::del(Filter& filter)
 {
     // NOTE: Should delete in filter function for perfomance
-    QueryType recordsToDelete = filter(records_);
+    
 }
 
 void db::Table::serialize(std::filesystem::path dataFilePath)
@@ -208,12 +215,13 @@ void db::Table::serialize(std::filesystem::path dataFilePath)
     if (outputFile.is_open())
     {
         outputFile << columns_.size(); // Number of columns
-        for(auto&& column: columns_){
+        for (auto&& column : columns_)
+        {
             columns::serialize(outputFile, column);
         }
-        outputFile << static_cast<int>(columns::ColumType::None); // We dont have zero column type, so zero is used as border
-
-
+        outputFile << static_cast<int>(
+            columns::ColumType::None); // We dont have zero column type, so zero
+                                       // is used as border
 
         outputFile << records_.size(); // Size of our table
         outputFile.close();

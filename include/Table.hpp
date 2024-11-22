@@ -3,7 +3,6 @@
 #include "Column.hpp"
 
 #include <filesystem>
-#include <functional>
 #include <list>
 #include <map>
 #include <memory>
@@ -17,6 +16,10 @@ namespace db
 class Table final
 {
 
+public:
+    using value_type = columns::BaseColumn::value_type;
+
+public:
     struct Record
     {
 
@@ -24,7 +27,7 @@ class Table final
         {
             columns::ColumType type;
             size_t size;
-            columns::BaseColumn::value_type rowData;
+            value_type rowData;
         };
 
         Record(size_t recordListSize)
@@ -33,6 +36,20 @@ class Table final
         }
 
         std::vector<Row> rows = {};
+    };
+
+    struct Filter
+    {
+        std::string columnName_;
+        value_type lowerBound_;
+        value_type upperBound_;
+
+        Filter(const std::string& columnName, value_type lowerBound,
+               value_type upperBound)
+            : columnName_(columnName),
+              lowerBound_(lowerBound),
+              upperBound_(upperBound) {};            
+
     };
 
 public:
@@ -45,13 +62,16 @@ public:
 
     using QueryType = std::list<Record>;
 
-    using FilterFunction = std::function<QueryType(QueryType&)>;
+    using Table_ptr = std::shared_ptr<Table>;
 
-public:
-    using value_type = columns::BaseColumn::value_type;
+    using SingleSelectResult = std::vector<std::shared_ptr<Record>>;
 
 public:
     Table(const std::string& name, std::vector<ColumnType>& columns);
+
+    Table(const Table& other) = delete;
+
+    Table(Table&& other) = delete;
 
 public:
     std::list<ColumnType> getColumns() const
@@ -77,9 +97,9 @@ public:
 public:
     void insert(InsertType& insertMap);
 
-    Table select(std::vector<std::string>&, FilterFunction& filter);
+    SingleSelectResult select(std::vector<std::string>&, Filter& filter);
 
-    void del(FilterFunction& filter);
+    void del(Filter& filter);
 
 private:
     // Helpers
