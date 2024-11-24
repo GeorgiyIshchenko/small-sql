@@ -38,11 +38,9 @@ public:
 
 public:
     void createTable(const std::string& name,
-                     std::vector<Table::ColumnType>& columns)
-    {
-        Table* newTable = new Table(name, columns);
-        tables_[name] = std::make_shared<Table>(newTable);
-    }
+                     std::vector<Table::ColumnType> columns);
+
+    void execute(const std::string& request);
 
 private:
     TablesContainer tables_;
