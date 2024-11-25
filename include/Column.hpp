@@ -31,6 +31,10 @@ void serialize(std::ofstream& file, std::shared_ptr<BaseColumn> column);
 
 std::shared_ptr<BaseColumn> deserialize(std::ifstream& file);
 
+void serializeCSV(std::ofstream& file, std::shared_ptr<BaseColumn> column);
+
+std::shared_ptr<BaseColumn> deserializeCSV(std::istringstream& file);
+
 class BaseColumn
 {
 
@@ -91,9 +95,17 @@ public:
 
     virtual size_t getValueSize() = 0;
 
-    friend void columns::serialize(std::ofstream &file, std::shared_ptr<BaseColumn> column);
+    friend void columns::serialize(std::ofstream& file,
+                                   std::shared_ptr<BaseColumn> column);
 
-    friend std::shared_ptr<BaseColumn> columns::deserialize(std::ifstream &file);
+    friend std::shared_ptr<BaseColumn>
+    columns::deserialize(std::ifstream& file);
+
+    friend void columns::serializeCSV(std::ofstream& file,
+                                      std::shared_ptr<BaseColumn> column);
+
+    friend std::shared_ptr<BaseColumn>
+    columns::deserializeCSV(std::istringstream& file);
 
 public:
     static ColumType getValueColumnType(value_type value)
@@ -121,8 +133,8 @@ protected:
     std::string name_;
     std::optional<value_type> defaultValue_;
     bool unique_;
-    bool key_;
     bool index_;
+    bool key_;
 };
 
 class Integer : public BaseColumn

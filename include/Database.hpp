@@ -40,7 +40,13 @@ public:
     void createTable(const std::string& name,
                      std::vector<Table::ColumnType> columns);
 
+    void insert(const std::string& tableName, Table::InsertType insertMap);
+
     void execute(const std::string& request);
+
+    void loadTableFromFile(const std::string& name, std::filesystem::path dataFilePath);
+
+    void storeTableInFile(const std::string& name, std::filesystem::path dataFilePath);
 
 private:
     TablesContainer tables_;

@@ -48,9 +48,10 @@ public:
                value_type upperBound)
             : columnName_(columnName),
               lowerBound_(lowerBound),
-              upperBound_(upperBound) {};            
-
+              upperBound_(upperBound) {};
     };
+
+    using FilterAndQuery = std::vector<Filter>;
 
 public:
     using ColumnType = std::shared_ptr<columns::BaseColumn>;
@@ -67,14 +68,17 @@ public:
     using SingleSelectResult = std::vector<std::shared_ptr<Record>>;
 
 public:
-    Table(const std::string& name, std::vector<ColumnType>& columns);
+
+    explicit Table(const std::string& name): tableName_(name) {};
+
+    Table(const std::string& name, std::vector<ColumnType> columns);
 
     Table(const Table& other) = delete;
 
     Table(Table&& other) = delete;
 
 public:
-    std::list<ColumnType> getColumns() const
+    std::vector<ColumnType> getColumns() const
     {
         return columns_;
     }
@@ -95,11 +99,11 @@ public:
     };
 
 public:
-    void insert(InsertType& insertMap);
+    void insert(InsertType insertMap);
 
-    SingleSelectResult select(std::vector<std::string>&, Filter& filter);
+    SingleSelectResult select(FilterAndQuery filter);
 
-    void del(Filter& filter);
+    void del(FilterAndQuery filter);
 
 private:
     // Helpers
@@ -112,11 +116,13 @@ private:
 public:
     void serialize(std::filesystem::path dataFilePath);
     void deserialize(std::filesystem::path dataFilePath);
+    void serializeCSV(std::filesystem::path dataFilePath);
+    void deserializeCSV(std::filesystem::path dataFilePath);
 
 private:
     std::string tableName_;
 
-    std::list<ColumnType> columns_{};
+    std::vector<ColumnType> columns_{};
     ColumnType keyColumn_;
     std::vector<ColumnType> uniquieColumns_{};
     std::vector<ColumnType> indexColumns_{};
