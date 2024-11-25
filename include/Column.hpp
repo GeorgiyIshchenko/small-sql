@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <cstddef>
+#include <cstdint>
 #include <fstream>
 #include <memory>
 #include <optional>
@@ -39,7 +40,7 @@ class BaseColumn
 {
 
 public:
-    using value_type = std::variant<bool, int, std::string, std::vector<char>>;
+    using value_type = std::variant<bool, int, std::string, std::vector<uint8_t>>;
 
 public:
     BaseColumn(const std::string& name, value_type defaultValue = {},
@@ -122,7 +123,7 @@ public:
         {
             return columns::ColumType::String;
         }
-        if (std::holds_alternative<std::vector<char>>(value))
+        if (std::holds_alternative<std::vector<uint8_t>>(value))
         {
             return columns::ColumType::Bytes;
         }
@@ -246,11 +247,11 @@ class Bytes final : public BaseColumn
 {
 
 public:
-    using value_type = std::vector<char>;
+    using value_type = std::vector<uint8_t>;
 
 public:
     Bytes(const std::string& name, size_t maxLen,
-          std::vector<char> defaultValue = {}, bool index = false,
+          std::vector<uint8_t> defaultValue = {}, bool index = false,
           bool unique = false, bool key = false)
         : BaseColumn(name, defaultValue, index, unique, key), maxLen_(maxLen)
     {

@@ -30,9 +30,9 @@ class CreateTable final : public BaseCommand
 {
 
 public:
-    CreateTable(const std::string tableName,
+    CreateTable(std::string tableName,
                 std::vector<Table::ColumnType> columns)
-        : tableName_(tableName), columns_(std::move(columns)) {};
+        : tableName_(std::move(tableName)), columns_(std::move(columns)) {};
 
     virtual ~CreateTable() = default;
 
@@ -53,8 +53,8 @@ class Insert final : public BaseCommand
 {
 
 public:
-    Insert(const std::string& tableName, Table::InsertType valuesMap)
-        : tableName_(tableName), valuesMap_(std::move(valuesMap)) {};
+    Insert(std::string tableName, Table::InsertType valuesMap)
+        : tableName_(std::move(tableName)), valuesMap_(std::move(valuesMap)) {};
 
     ~Insert() = default;
 
@@ -66,7 +66,7 @@ public:
     }
 
 private:
-    const std::string tableName_;
+    std::string tableName_;
     Table::InsertType valuesMap_;
 };
 

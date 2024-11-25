@@ -7,18 +7,30 @@
 namespace db
 {
 
-void Database::createTable(const std::string& name,
+void Database::createTable(std::string name,
                            std::vector<Table::ColumnType> columns)
 {
+#ifdef DEBUG
+    std::cout << "Creating table: " + name << std::endl;
+#endif
     tables_[name] = std::make_unique<Table>(name, std::move(columns));
+#ifdef DEBUG
+    std::cout << "Successfully created table: " + name << std::endl;
+#endif
 }
 
-void Database::insert(const std::string& tableName, Table::InsertType insertMap)
+void Database::insert(std::string tableName, Table::InsertType insertMap)
 {
+#ifdef DEBUG
+    std::cout << "Inserting data to table: " + tableName << std::endl;
+#endif
     tables_[tableName]->insert(std::move(insertMap));
+#ifdef DEBUG
+    std::cout << "Successfully inserted data to table: " + tableName << std::endl;
+#endif
 }
 
-void Database::execute(const std::string& request)
+void Database::execute(std::string request)
 {
     lexer::Lexer lexer{ request };
     parser::Parser parser{ lexer };
@@ -26,7 +38,7 @@ void Database::execute(const std::string& request)
     command->execute();
 }
 
-void Database::loadTableFromFile(const std::string& name,
+void Database::loadTableFromFile(std::string name,
                                  std::filesystem::path dataFilePath)
 {
     tables_[name] = std::make_unique<Table>(name);
@@ -37,7 +49,7 @@ void Database::loadTableFromFile(const std::string& name,
 #endif
 }
 
-void Database::storeTableInFile(const std::string& name,
+void Database::storeTableInFile(std::string name,
                                 std::filesystem::path dataFilePath)
 {
 #ifdef DEBUG

@@ -1,7 +1,7 @@
 #include "Lexer.hpp"
 
+#include "DataBaseException.hpp"
 #include <algorithm>
-#include <stdexcept>
 
 namespace db
 {
@@ -24,6 +24,14 @@ char Lexer::get()
     pos++;
     column++;
     return c;
+}
+
+void Lexer::skipWhitespace()
+{
+    while (isspace(peek()))
+    {
+        get();
+    }
 }
 
 Token Lexer::identifierOrKeyword()
@@ -72,12 +80,12 @@ Token Lexer::identifierOrKeyword()
         return Token{ TOK_BY, lexeme, line, column };
     if (upperLexeme == "ORDERED")
         return Token{ TOK_ORDERED, lexeme, line, column };
-    if (upperLexeme == "AUTOINCREMENT")
-        return Token{ TOK_ATT_AUTOINCREMENT, lexeme, line, column };  
-    if (upperLexeme == "KEY")
-        return Token{ TOK_ATT_KEY, lexeme, line, column };  
-    if (upperLexeme == "UNIQUE")
-        return Token{ TOK_ATT_UNIQUE, lexeme, line, column };
+    // if (upperLexeme == "AUTOINCREMENT")
+    //     return Token{ TOK_ATT_AUTOINCREMENT, lexeme, line, column };
+    // if (upperLexeme == "KEY")
+    //     return Token{ TOK_ATT_KEY, lexeme, line, column };
+    // if (upperLexeme == "UNIQUE")
+    //     return Token{ TOK_ATT_UNIQUE, lexeme, line, column };
     if (upperLexeme == "INT32")
         return Token{ TOK_INT32, lexeme, line, column };
     if (upperLexeme == "STRING")
@@ -152,7 +160,7 @@ Token Lexer::parseOperator()
         }
         else
         {
-            throw std::runtime_error("Unexpected character '&'");
+            throw DatabaseException("Unexpected character '&'");
         }
     case '|':
         return Token{ TOK_BITWISE_OR, "|", line, column };
@@ -164,7 +172,7 @@ Token Lexer::parseOperator()
         }
         else
         {
-            throw std::runtime_error("Unexpected character '^'");
+            throw DatabaseException("Unexpected character '^'");
         }
     case '(':
         return Token{ TOK_LPAREN, "(", line, column };
@@ -179,13 +187,13 @@ Token Lexer::parseOperator()
     case '}':
         return Token{ TOK_RBRACE, "}", line, column };
     case '[':
-        return Token{ TOK_LBRACKET, "{", line, column };
+        return Token{ TOK_LBRACKET, "[", line, column };
     case ']':
-        return Token{ TOK_RBRACKET, "}", line, column };
+        return Token{ TOK_RBRACKET, "]", line, column };
     case '.':
         return Token{ TOK_DOT, ".", line, column };
     default:
-        throw std::runtime_error(
+        throw DatabaseException(
             std::string("Unexpected character '") + currentChar + "' at line " +
             std::to_string(line) + ", column " + std::to_string(column));
     }
@@ -248,18 +256,21 @@ Token Lexer::hexNumber()
     return Token{ TOK_HEX_LITERAL, lexeme, line, column };
 }
 
-Token Lexer::stringLiteral() {
+Token Lexer::stringLiteral()
+{
     get(); // Consume opening quote
     size_t start = pos;
-    while (peek() != '"' && peek() != '\0') {
+    while (peek() != '"' && peek() != '\0')
+    {
         get();
     }
-    if (peek() == '\0') {
-        throw std::runtime_error("Unterminated string literal");
+    if (peek() == '\0')
+    {
+        throw DatabaseException("Unterminated string literal");
     }
     std::string lexeme = input.substr(start, pos - start);
     get(); // Consume closing quote
-    return Token{TOK_STRING_LITERAL, lexeme, line, column};
+    return Token{ TOK_STRING_LITERAL, lexeme, line, column };
 }
 
 } // namespace lexer

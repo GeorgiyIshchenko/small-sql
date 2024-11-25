@@ -1,11 +1,12 @@
 
 #include "Column.hpp"
+#include "DataBaseException.hpp"
 #include "Helpers.hpp"
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <sstream>
-#include <stdexcept>
 
 void db::columns::serialize(std::ofstream& file,
                             std::shared_ptr<BaseColumn> column)
@@ -194,8 +195,8 @@ void db::columns::serializeCSV(std::ofstream& file,
             defaultValueTypeStr = "bytes";
             // Convert bytes to hex string or base64 if needed
             defaultValueStr =
-                std::string(std::get<std::vector<char>>(defaultValue).begin(),
-                            std::get<std::vector<char>>(defaultValue).end());
+                std::string(std::get<std::vector<uint8_t>>(defaultValue).begin(),
+                            std::get<std::vector<uint8_t>>(defaultValue).end());
             break;
         default:
             defaultValueTypeStr = "None";
@@ -261,7 +262,7 @@ db::columns::deserializeCSV(std::istringstream& file)
     // Check if we have at least 9 fields
     if (fields.size() < 9)
     {
-        throw std::runtime_error("Error: Invalid number of fields in CSV line.");
+        throw DatabaseException("Error: Invalid number of fields in CSV line.");
     }
 
     // Extract fields
@@ -339,7 +340,7 @@ db::columns::deserializeCSV(std::istringstream& file)
         }
         case ColumType::Bool:
         {
-            bool val = defaultValueStr == "1";
+            bool val = defaultValueStr == "true";
             defaultValue = val;
             break;
         }
@@ -350,7 +351,7 @@ db::columns::deserializeCSV(std::istringstream& file)
         }
         case ColumType::Bytes:
         {
-            std::vector<char> bytes(defaultValueStr.begin(),
+            std::vector<uint8_t> bytes(defaultValueStr.begin(),
                                     defaultValueStr.end());
             defaultValue = bytes;
             break;
@@ -398,16 +399,16 @@ db::columns::deserializeCSV(std::istringstream& file)
     else if (colType == ColumType::Bytes)
     {
         size_t maxLen = std::stoull(additionalFieldStr);
-        std::vector<char> defaultBytesValue =
+        std::vector<uint8_t> defaultBytesValue =
             defaultValuePresent && defaultValue.has_value()
-                ? std::get<std::vector<char>>(defaultValue.value())
-                : std::vector<char>();
+                ? std::get<std::vector<uint8_t>>(defaultValue.value())
+                : std::vector<uint8_t>();
         column = std::make_shared<Bytes>(name, maxLen, defaultBytesValue, index,
                                          unique, key);
     }
     else
     {
-        throw std::runtime_error("Error: Unknown column type.");
+        throw DatabaseException("Error: Unknown column type.");
     }
 
     return column;

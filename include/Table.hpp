@@ -30,12 +30,14 @@ public:
             value_type rowData;
         };
 
-        Record(size_t recordListSize)
+        Record(size_t size)
         {
-            rows.resize(recordListSize);
+            for(size_t i = 0; i < size; ++i){
+                rows.emplace_back(columns::ColumType::None, 0, 0);
+            }
         }
 
-        std::vector<Row> rows = {};
+        std::vector<Row> rows;
     };
 
     struct Filter
@@ -68,8 +70,8 @@ public:
     using SingleSelectResult = std::vector<std::shared_ptr<Record>>;
 
 public:
-
-    explicit Table(const std::string& name): tableName_(name) {};
+    explicit Table(const std::string& name)
+        : tableName_(name) {};
 
     Table(const std::string& name, std::vector<ColumnType> columns);
 
@@ -107,10 +109,10 @@ public:
 
 private:
     // Helpers
-    void insertImpl(Record);
+    void insertImpl(InsertType mappedRecord);
     void validateInsertion(InsertType&);
-    Record createRecord(InsertType&);
-    void validateRecord(Record& newRecord);
+    void buildRecord(Record&, InsertType&);
+    void validateRecord(std::shared_ptr<Record>);
     void createIndexes(std::shared_ptr<Record>);
 
 public:

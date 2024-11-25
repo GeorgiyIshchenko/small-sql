@@ -24,7 +24,7 @@ public:
     };
 
 public:
-    Parser(lexer::Lexer& lexer);
+    Parser(lexer::Lexer& lexer): lexer_(lexer) {};
 
     std::unique_ptr<commands::BaseCommand> parseCommand();
 

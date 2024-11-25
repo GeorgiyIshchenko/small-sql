@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <memory>
 #include <ranges>
 #include <string>
@@ -15,10 +16,12 @@
 db::Table::Table(const std::string& name, std::vector<ColumnType> values)
 {
     tableName_ = name;
+    size_t fieldIdx = 0;
     for (auto&& column : values)
     {
         columns_.push_back(column);
         columnMap_[column->name()] = column;
+        recordMapping_[column->name()] = fieldIdx++;
         if (column->isKey())
         {
             keyColumn_ = column;
@@ -46,6 +49,9 @@ db::Table::Table(const std::string& name, std::vector<ColumnType> values)
         auto&& idField = db::columns::Id();
         auto&& sharedIdField = std::make_shared<columns::Id>(idField);
         columns_.push_back(sharedIdField);
+        columnMap_[idField.name()] = sharedIdField;
+        recordMapping_[idField.name()] = fieldIdx++;
+        autoIncrementColumnsMap_[idField.name()] = 0;
         uniquieColumns_.push_back(sharedIdField);
         keyColumn_ = sharedIdField;
     }
@@ -53,14 +59,13 @@ db::Table::Table(const std::string& name, std::vector<ColumnType> values)
 
 void db::Table::validateInsertion(InsertType& mappedRecord)
 {
-    if (mappedRecord.size() != columnMap_.size())
+    if (mappedRecord.size() > columnMap_.size())
     {
         throw TableException("Insert " + tableName_ +
                              ": Invalid amount of fields: " +
                              std::to_string(mappedRecord.size()) + "/" +
                              std::to_string(columnMap_.size()) + "!");
     }
-    Record newRecord{ columns_.size() };
     for (auto&& [name, value] : mappedRecord)
     {
         auto it = columnMap_.find(name);
@@ -79,9 +84,8 @@ void db::Table::validateInsertion(InsertType& mappedRecord)
     }
 }
 
-db::Table::Record db::Table::createRecord(InsertType& mappedRecord)
+void db::Table::buildRecord(Record& newRecord, InsertType& mappedRecord)
 {
-    Record newRecord{ columns_.size() };
 
     // Firstly, construct default object
 
@@ -107,21 +111,21 @@ db::Table::Record db::Table::createRecord(InsertType& mappedRecord)
     {
         Record::Row newRow;
         newRow.size = columnMap_[name]->getValueSize();
-        newRow.rowData = autoIncrementColumnsMap_[name];
+        newRow.rowData = value;
+        newRow.type = columns::BaseColumn::getValueColumnType(value);
         autoIncrementColumnsMap_[name]++;
         newRecord.rows[recordMapping_[name]] = newRow;
     }
-    return newRecord;
 }
 
-void db::Table::validateRecord(db::Table::Record& newRecord)
+void db::Table::validateRecord(std::shared_ptr<Record> newRecord)
 {
     for (auto&& record : records_)
     {
         for (auto&& uniqueField : uniquieColumns_)
         {
             if (record.rows[recordMapping_[uniqueField->name()]].rowData ==
-                newRecord.rows[recordMapping_[uniqueField->name()]].rowData)
+                newRecord->rows[recordMapping_[uniqueField->name()]].rowData)
             {
                 throw TableException(
                     "Insert " + tableName_ +
@@ -143,24 +147,52 @@ void db::Table::createIndexes(std::shared_ptr<Record> sharedRecord)
     }
 }
 
-void db::Table::insertImpl(Record newRecord)
+void db::Table::insertImpl(InsertType mappedRecord)
 {
+
+    Record newRecord{ mappedRecord.size() + autoIncrementColumnsMap_.size() };
+
+    buildRecord(newRecord, mappedRecord);
+
+    auto shared = std::make_shared<Record>(newRecord);
+
+    validateRecord(shared);
+
     // Add to our table data
-    records_.push_back(std::move(newRecord));
+    records_.push_back(newRecord);
 
     // Make indexes
-    auto sharedNewRecord = std::make_shared<Record>(records_.back());
-
-    createIndexes(sharedNewRecord);
+    //createIndexes(shared);
 }
 
 void db::Table::insert(InsertType mappedRecord)
 {
-    auto newRecord = createRecord(mappedRecord);
+#if DEBUG
+    std::cout << "New iserion: to table " + tableName_ + ": ";
+    for (auto&& [key, val] : mappedRecord)
+    {
+        std::cout << "{" << key << ", ";
+        if (std::holds_alternative<int>(val))
+        {
+            std::cout << "(int) " << std::to_string(std::get<int>(val));
+        }
+        else if (std::holds_alternative<bool>(val))
+        {
+            std::cout << "(bool) " << (std::get<bool>(val) ? "1" : "0");
+        }
+        else if (std::holds_alternative<std::string>(val))
+        {
+            std::cout << "(string) "
+                      << escapeCSVField(std::get<std::string>(val));
+        }
+        std::cout << "} ";
+    }
+    std::cout << std::endl;
+#endif
 
-    validateRecord(newRecord);
+    validateInsertion(mappedRecord);
 
-    insertImpl(std::move(newRecord));
+    insertImpl(mappedRecord);
 };
 
 db::Table::SingleSelectResult db::Table::select(FilterAndQuery filters)
@@ -206,7 +238,7 @@ db::Table::SingleSelectResult db::Table::select(FilterAndQuery filters)
 void db::Table::del(FilterAndQuery filters)
 {
     // NOTE: Should delete in filter function for perfomance
-    (void) filters;
+    (void)filters;
 }
 
 void db::Table::serialize(std::filesystem::path dataFilePath)
@@ -230,7 +262,7 @@ void db::Table::serialize(std::filesystem::path dataFilePath)
 
 void db::Table::deserialize(std::filesystem::path dataFilePath)
 {
-    (void) dataFilePath;
+    (void)dataFilePath;
 }
 
 void db::Table::serializeCSV(std::filesystem::path dataFilePath)
@@ -241,6 +273,14 @@ void db::Table::serializeCSV(std::filesystem::path dataFilePath)
         throw TableException("Failed to open file for writing: " +
                              dataFilePath.string());
     }
+
+    // table name
+
+    file << "#TABLE_NAME" << std::endl;
+    file << tableName_ << std::endl;
+
+    // columns separator
+    file << "#COLUMNS" << std::endl;
 
     // columns
     for (const auto& column : columns_)
@@ -268,39 +308,40 @@ void db::Table::serializeCSV(std::filesystem::path dataFilePath)
     // records
     for (const auto& record : records_)
     {
-        std::stringstream recordStream;
         for (const auto& row : record.rows)
         {
             std::string valueStr;
-            // Convert row data to string based on type
-            if (std::holds_alternative<int>(row.rowData))
-            {
-                valueStr = std::to_string(std::get<int>(row.rowData));
-            }
-            else if (std::holds_alternative<bool>(row.rowData))
-            {
-                valueStr = std::get<bool>(row.rowData) ? "1" : "0";
-            }
-            else if (std::holds_alternative<std::string>(row.rowData))
-            {
-                valueStr = escapeCSVField(std::get<std::string>(row.rowData));
-            }
-            else if (std::holds_alternative<std::vector<char>>(row.rowData))
+            if (row.type == columns::ColumType::Bytes)
             {
                 // bytes to hex
-                auto& bytes = std::get<std::vector<char>>(row.rowData);
+                auto& bytes = std::get<columns::Bytes::value_type>(row.rowData);
                 valueStr = std::string(bytes.begin(), bytes.end());
                 valueStr = escapeCSVField(valueStr);
             }
-            recordStream << valueStr << ",";
+            else if (row.type == columns::ColumType::String)
+            {
+                valueStr = escapeCSVField(
+                    std::get<columns::String::value_type>(row.rowData));
+            }
+            else if (row.type == columns::ColumType::Integer)
+            {
+                valueStr = std::to_string(
+                    std::get<columns::Integer::value_type>(row.rowData));
+            }
+            else if (row.type == columns::ColumType::Bool)
+            {
+                valueStr = (std::get<columns::Bool::value_type>(row.rowData)
+                                ? "true"
+                                : "false");
+            }
+            else if (row.type == columns::ColumType::Id)
+            {
+                valueStr = std::to_string(
+                    std::get<columns::Integer::value_type>(row.rowData));
+            }
+            file << valueStr << ",";
         }
-        std::string recordLine = recordStream.str();
-
-        if (!recordLine.empty())
-        {
-            recordLine.pop_back();
-        }
-        file << recordLine << std::endl;
+        file << std::endl;
     }
 
     file.close();
@@ -320,8 +361,23 @@ void db::Table::deserializeCSV(std::filesystem::path dataFilePath)
     records_.clear();
     recordMapping_.clear();
 
-    // columns
     std::string line;
+
+    // tableName
+    std::getline(file, line);
+    if (line != "#TABLE_NAME")
+    {
+        throw TableException("CSV doesnt have table name separator.");
+    }
+    std::getline(file, line);
+    tableName_ = line;
+
+    // columns
+    std::getline(file, line);
+    if (line != "#COLUMNS")
+    {
+        throw TableException("CSV doesnt have columns separator.");
+    }
     while (std::getline(file, line))
     {
         if (line == "#DATA")
@@ -372,7 +428,7 @@ void db::Table::deserializeCSV(std::filesystem::path dataFilePath)
                 "Mismatch between number of columns and data fields.");
         }
 
-        Record record(columns_.size());
+        Record record(columns_.size() + autoIncrementColumnsMap_.size());
 
         for (size_t i = 0; i < fieldValues.size(); ++i)
         {
@@ -392,7 +448,7 @@ void db::Table::deserializeCSV(std::filesystem::path dataFilePath)
             }
             else if (colType == columns::ColumType::Bool)
             {
-                bool value = valueStr == "1";
+                bool value = valueStr == "true";
                 row.rowData = value;
             }
             else if (colType == columns::ColumType::String)
@@ -401,7 +457,7 @@ void db::Table::deserializeCSV(std::filesystem::path dataFilePath)
             }
             else if (colType == columns::ColumType::Bytes)
             {
-                std::vector<char> bytes(valueStr.begin(), valueStr.end());
+                std::vector<uint8_t> bytes(valueStr.begin(), valueStr.end());
                 row.rowData = bytes;
             }
             else
