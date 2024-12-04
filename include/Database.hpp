@@ -37,10 +37,16 @@ public:
     }
 
 public:
-    void createTable(std::string name,
+    void createTable(std::string& name,
                      std::vector<Table::ColumnType> columns);
 
-    void insert(std::string tableName, Table::InsertType insertMap);
+    void insert(std::string& tableName, Table::InsertType insertMap);
+
+    std::unique_ptr<Table::View> select(std::string& tableName, std::vector<std::string>& selectList, std::unique_ptr<filters::Filter> filter);
+
+    void update(std::string& tableName, std::unique_ptr<filters::Filter> filter, Table::InsertType newValues);
+
+    void del(std::string& tableName, std::unique_ptr<filters::Filter> filter);
 
     void execute(std::string request);
 

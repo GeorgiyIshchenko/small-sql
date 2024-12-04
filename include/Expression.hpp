@@ -14,12 +14,24 @@ namespace expression
 class Context
 {
 
+
+public: 
+
+    Context() = default;
+
+    Context(const std::string& tableName): tableName_(tableName) {}
+
 public:
     using Value = columns::BaseColumn::value_type;
 
 public:
     Value getValue(const std::string& name) const;
     Value getStringLength(const std::string& name) const;
+
+private:
+
+    std::string tableName_;
+
 };
 
 class Expression

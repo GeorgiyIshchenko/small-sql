@@ -26,5 +26,22 @@ TEST(Operation, Complex)
         "insert (login = \"gosha_vtoroy\", password_hash = 0xbeefdead, "
         "is_admin = false) to users");
 
+    db::Database::getInstance().execute(
+        "insert (login = \"gosha_treriy\", password_hash = 0xbeefdead, "
+        "is_admin = false) to users");
+
+    db::Database::getInstance().execute("SELECT * FROM users");
+
+    db::Database::getInstance().execute("SELECT id, login FROM users");
+
+    db::Database::getInstance().execute("SELECT id, login FROM users where id = 1");
+
     db::Database::getInstance().storeTableInFile("users", dbPath);
+}
+
+TEST(Operation, Select)
+{
+
+    db::Database::getInstance().loadTableFromFile("users", dbPath);
+
 }

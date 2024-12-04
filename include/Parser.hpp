@@ -4,7 +4,9 @@
 #include "Command.hpp"
 #include "Expression.hpp"
 #include "Lexer.hpp"
+#include "Filter.hpp"
 
+#include <memory>
 #include <vector>
 
 namespace db
@@ -58,6 +60,13 @@ private:
     std::unique_ptr<expression::Expression> parseMultiplicativeExpression();
     std::unique_ptr<expression::Expression> parseUnaryExpression();
     std::unique_ptr<expression::Expression> parsePrimaryExpression();
+
+    std::unique_ptr<filters::Filter> parseWhere();
+    std::unique_ptr<filters::Filter> parseOrFilter();
+    std::unique_ptr<filters::Filter> parseAndFilter();
+    std::unique_ptr<filters::Filter> parseNotFilter();
+    std::unique_ptr<filters::Filter> parseComparisonFilter();
+
 
     void parseColumnDefinitions(std::vector<Table::ColumnType>& columns);
     void parseAssignments(Table::InsertType& valuesMap);

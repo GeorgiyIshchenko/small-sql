@@ -1,6 +1,7 @@
 #include "Parser.hpp"
 #include "Column.hpp"
 #include "DataBaseException.hpp"
+#include "Filter.hpp"
 #include "Lexer.hpp"
 #include <cctype>
 #include <iostream>
@@ -103,7 +104,8 @@ Parser::getActualValue(lexer::TokenType dataType, std::string stringVal)
     {
         actualValue = std::stoi(stringVal);
     }
-    else if (dataType == lexer::TOK_STRING_LITERAL || dataType == lexer::TOK_STRING)
+    else if (dataType == lexer::TOK_STRING_LITERAL ||
+             dataType == lexer::TOK_STRING)
     {
         actualValue = std::move(stringVal);
     }
@@ -123,7 +125,8 @@ Parser::getActualValue(lexer::TokenType dataType, std::string stringVal)
         }
         actualValue = std::move(bytes);
     }
-    else if (dataType == lexer::TOK_TRUE || dataType == lexer::TOK_FALSE || dataType == lexer::TOK_BOOL)
+    else if (dataType == lexer::TOK_TRUE || dataType == lexer::TOK_FALSE ||
+             dataType == lexer::TOK_BOOL)
     {
         actualValue = stringVal == "true";
     }
@@ -273,8 +276,7 @@ std::unique_ptr<commands::Select> Parser::parseSelect()
     std::vector<std::string> selectList;
     if (match(lexer::TOK_MULTIPLY))
     {
-        // SELECT *
-        selectList.push_back("*");
+        // PASS
     }
     else
     {
@@ -282,14 +284,12 @@ std::unique_ptr<commands::Select> Parser::parseSelect()
         {
             expect(lexer::TOK_IDENTIFIER);
             std::string column = previousToken_.lexeme;
-            advance();
 
             // Handle qualified names
             if (match(lexer::TOK_DOT))
             {
                 expect(lexer::TOK_IDENTIFIER);
-                column += "." + previousToken_.lexeme;
-                advance();
+                column = previousToken_.lexeme; // as we dont have joins
             }
 
             selectList.push_back(column);
@@ -303,7 +303,6 @@ std::unique_ptr<commands::Select> Parser::parseSelect()
     expect(lexer::TOK_IDENTIFIER);
     std::string tableName = previousToken_.lexeme;
 
-    // TODO: join, possible interface:
     std::vector<JoinClause> joins;
     while (match(lexer::TOK_JOIN))
     {
@@ -311,20 +310,21 @@ std::unique_ptr<commands::Select> Parser::parseSelect()
     }
 
     // where
-    std::unique_ptr<expression::Expression> whereCondition = nullptr;
+    std::unique_ptr<filters::Filter> whereCondition = nullptr;
     if (match(lexer::TOK_WHERE))
     {
-        whereCondition = parseCondition();
+        whereCondition = parseWhere();
     }
 
     // Create and return the command object
-    auto command = std::make_unique<commands::Select>();
-    // TODO: command->joins = std::move(joins);
-    // command->tableName = tableName;
-    // command->selectList = selectList;
-    // command->whereCondition = std::move(whereCondition);
+    auto command = std::make_unique<commands::Select>(
+        tableName, selectList, std::move(whereCondition));
 
-    return command;
+#ifdef DEBUG
+    std::cout << "// Parsing select to table " + tableName +
+                     " command is ended!"
+              << std::endl;
+#endif
 
     return command;
 }
@@ -359,13 +359,15 @@ std::unique_ptr<commands::Update> Parser::parseUpdate()
     parseAssignments(assignments);
 
     // where
-    // Implement parseCondition() if needed
+    std::unique_ptr<filters::Filter> whereCondition = nullptr;
+    if (match(lexer::TOK_WHERE))
+    {
+        whereCondition = parseWhere();
+    }
 
     // Create and return the command object
-    auto command = std::make_unique<commands::Update>();
-    // init command!!
-    // command->tableName = tableName;
-    // command->assignments = assignments;
+    auto command = std::make_unique<commands::Update>(
+        tableName, std::move(whereCondition), assignments);
 
     return command;
 }
@@ -380,17 +382,15 @@ std::unique_ptr<commands::Delete> Parser::parseDelete()
     advance();
 
     // where
-    std::unique_ptr<expression::Expression> whereCondition = nullptr;
+    std::unique_ptr<filters::Filter> whereCondition = nullptr;
     if (match(lexer::TOK_WHERE))
     {
-        whereCondition = parseCondition();
+        whereCondition = parseWhere();
     }
 
     // Create and return the command object
-    auto command = std::make_unique<commands::Delete>();
-    // init command!!
-    // command->tableName = tableName;
-    // command->whereCondition = std::move(whereCondition);
+    auto command = std::make_unique<commands::Delete>(
+        tableName, std::move(whereCondition));
 
     return command;
 }
@@ -536,6 +536,12 @@ std::unique_ptr<expression::Expression> Parser::parsePrimaryExpression()
 
         return std::make_unique<expression::IdentifierExpression>(name);
     }
+    else if (match(lexer::TOK_DOT))
+    {
+        expect(lexer::TOK_IDENTIFIER);
+        return std::make_unique<expression::IdentifierExpression>(
+            previousToken_.lexeme);
+    }
     else if (match(lexer::TOK_INT_LITERAL) ||
              match(lexer::TOK_STRING_LITERAL) || match(lexer::TOK_HEX_LITERAL))
     {
@@ -550,6 +556,94 @@ std::unique_ptr<expression::Expression> Parser::parsePrimaryExpression()
         throw DatabaseException("Unexpected token in expression at line " +
                                 std::to_string(currentToken_.line));
     }
+}
+
+std::unique_ptr<filters::Filter> Parser::parseWhere()
+{
+    return parseOrFilter();
+}
+
+std::unique_ptr<filters::Filter> Parser::parseOrFilter()
+{
+    auto left = parseAndFilter();
+
+    while (match(lexer::TOK_OR))
+    {
+        auto right = parseAndFilter();
+        left = std::make_unique<filters::LogicalFilter>(
+            filters::LogicalFilter::OR, std::move(left), std::move(right));
+    }
+
+    return left;
+}
+
+std::unique_ptr<filters::Filter> Parser::parseAndFilter()
+{
+    auto left = parseNotFilter();
+
+    while (match(lexer::TOK_AND))
+    {
+        auto right = parseNotFilter();
+        left = std::make_unique<filters::LogicalFilter>(
+            filters::LogicalFilter::AND, std::move(left), std::move(right));
+    }
+
+    return left;
+}
+
+std::unique_ptr<filters::Filter> Parser::parseNotFilter()
+{
+    if (match(lexer::TOK_NOT))
+    {
+        auto operand = parseNotFilter();
+        return std::make_unique<filters::NotFilter>(std::move(operand));
+    }
+    else
+    {
+        return parseComparisonFilter();
+    }
+}
+
+std::unique_ptr<filters::Filter> Parser::parseComparisonFilter()
+{
+    expect(lexer::TOK_IDENTIFIER);
+    std::string fieldName = previousToken_.lexeme;
+
+    filters::ComparisonFilter::Operator op;
+
+    if (match(lexer::TOK_EQUAL))
+    {
+        op = filters::ComparisonFilter::EQUAL;
+    }
+    else if (match(lexer::TOK_NOT_EQUAL))
+    {
+        op = filters::ComparisonFilter::NOT_EQUAL;
+    }
+    else if (match(lexer::TOK_LESS))
+    {
+        op = filters::ComparisonFilter::LESS_THAN;
+    }
+    else if (match(lexer::TOK_LESS_EQUAL))
+    {
+        op = filters::ComparisonFilter::LESS_THAN_OR_EQUAL;
+    }
+    else if (match(lexer::TOK_GREATER))
+    {
+        op = filters::ComparisonFilter::GREATER_THAN;
+    }
+    else if (match(lexer::TOK_GREATER_EQUAL))
+    {
+        op = filters::ComparisonFilter::GREATER_THAN_OR_EQUAL;
+    }
+    else
+    {
+        throw DatabaseException("Invalid WHERE operator");
+    }
+
+    auto value = parseCondition();
+
+    return std::make_unique<filters::ComparisonFilter>(fieldName, op,
+                                                       value->evaluate({}));
 }
 
 } // namespace parser

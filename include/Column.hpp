@@ -28,10 +28,6 @@ enum class ColumType : u_char
 
 class BaseColumn;
 
-void serialize(std::ofstream& file, std::shared_ptr<BaseColumn> column);
-
-std::shared_ptr<BaseColumn> deserialize(std::ifstream& file);
-
 void serializeCSV(std::ofstream& file, std::shared_ptr<BaseColumn> column);
 
 std::shared_ptr<BaseColumn> deserializeCSV(std::istringstream& file);
@@ -95,12 +91,6 @@ public:
     }
 
     virtual size_t getValueSize() = 0;
-
-    friend void columns::serialize(std::ofstream& file,
-                                   std::shared_ptr<BaseColumn> column);
-
-    friend std::shared_ptr<BaseColumn>
-    columns::deserialize(std::ifstream& file);
 
     friend void columns::serializeCSV(std::ofstream& file,
                                       std::shared_ptr<BaseColumn> column);

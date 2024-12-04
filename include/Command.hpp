@@ -1,8 +1,10 @@
 #pragma once
 
 #include "Database.hpp"
+#include "Filter.hpp"
 
 #include "Table.hpp"
+#include <memory>
 #include <optional>
 #include <vector>
 
@@ -12,7 +14,7 @@ namespace db
 namespace commands
 {
 
-using CommandRetType = std::optional<Table::Table_ptr>;
+using CommandRetType = std::optional<std::unique_ptr<Table::View>>;
 
 class BaseCommand
 {
@@ -30,8 +32,7 @@ class CreateTable final : public BaseCommand
 {
 
 public:
-    CreateTable(std::string tableName,
-                std::vector<Table::ColumnType> columns)
+    CreateTable(std::string tableName, std::vector<Table::ColumnType> columns)
         : tableName_(std::move(tableName)), columns_(std::move(columns)) {};
 
     virtual ~CreateTable() = default;
@@ -39,8 +40,7 @@ public:
 public:
     CommandRetType execute() override
     {
-        Database::getInstance().createTable(std::move(tableName_),
-                                            std::move(columns_));
+        Database::getInstance().createTable(tableName_, std::move(columns_));
         return {};
     }
 
@@ -74,7 +74,8 @@ class Select final : public BaseCommand
 {
 
 public:
-    Select()
+    Select(std::string tableName, std::vector<std::string>& selectList, std::unique_ptr<filters::Filter> filter)
+        : tableName_(tableName), selectList_(selectList), filter_(std::move(filter))
     {
     }
 
@@ -83,15 +84,26 @@ public:
 public:
     CommandRetType execute() override
     {
-        return {};
+        auto view = Database::getInstance().select(tableName_, selectList_, std::move(filter_));
+        view->print();
+        return view;
     }
+
+private:
+    std::string tableName_;
+    std::vector<std::string> selectList_;
+    std::unique_ptr<filters::Filter> filter_;
 };
 
 class Update final : public BaseCommand
 {
 
 public:
-    Update()
+    Update(std::string tableName, std::unique_ptr<filters::Filter> filter,
+           Table::InsertType newValues)
+        : tableName_(tableName),
+          filter_(std::move(filter)),
+          newValues_(std::move(newValues))
     {
     }
 
@@ -100,15 +112,22 @@ public:
 public:
     CommandRetType execute() override
     {
+        Database::getInstance().update(tableName_, std::move(filter_), newValues_);
         return {};
     }
+
+private:
+    std::string tableName_;
+    std::unique_ptr<filters::Filter> filter_;
+    Table::InsertType newValues_;
 };
 
 class Delete final : public BaseCommand
 {
 
 public:
-    Delete()
+    Delete(std::string tableName, std::unique_ptr<filters::Filter> filter)
+        : tableName_(tableName), filter_(std::move(filter))
     {
     }
 
@@ -117,8 +136,13 @@ public:
 public:
     CommandRetType execute() override
     {
+        Database::getInstance().del(tableName_, std::move(filter_));
         return {};
     }
+
+private:
+    std::string tableName_;
+    std::unique_ptr<filters::Filter> filter_;
 };
 
 class Join final : public BaseCommand

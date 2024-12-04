@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Column.hpp"
+// #include "Filter.hpp"
 
 #include <filesystem>
 #include <list>
@@ -12,6 +13,11 @@
 
 namespace db
 {
+
+namespace filters
+{
+class Filter;
+}
 
 class Table final
 {
@@ -32,28 +38,14 @@ public:
 
         Record(size_t size)
         {
-            for(size_t i = 0; i < size; ++i){
+            for (size_t i = 0; i < size; ++i)
+            {
                 rows.emplace_back(columns::ColumType::None, 0, 0);
             }
         }
 
         std::vector<Row> rows;
     };
-
-    struct Filter
-    {
-        std::string columnName_;
-        value_type lowerBound_;
-        value_type upperBound_;
-
-        Filter(const std::string& columnName, value_type lowerBound,
-               value_type upperBound)
-            : columnName_(columnName),
-              lowerBound_(lowerBound),
-              upperBound_(upperBound) {};
-    };
-
-    using FilterAndQuery = std::vector<Filter>;
 
 public:
     using ColumnType = std::shared_ptr<columns::BaseColumn>;
@@ -67,7 +59,27 @@ public:
 
     using Table_ptr = std::shared_ptr<Table>;
 
-    using SingleSelectResult = std::vector<std::shared_ptr<Record>>;
+    using RecordMappingT = std::unordered_map<std::string, size_t>;
+
+public:
+    struct View
+    {
+
+        std::string tableName_;
+        std::vector<ColumnType> columnPtrs = {};
+        RecordMappingT recordMapping;
+        std::list<std::shared_ptr<Record>> recordPtrs = {};
+
+        View(std::string tableName, std::vector<ColumnType>& columnPtrs,
+             RecordMappingT& recordMapping)
+            : tableName_(std::move(tableName)),
+              columnPtrs(columnPtrs),
+              recordMapping(recordMapping)
+        {
+        }
+
+        void print();
+    };
 
 public:
     explicit Table(const std::string& name)
@@ -100,12 +112,19 @@ public:
         return keyColumn_;
     };
 
+    RecordMappingT& getRecordMapping()
+    {
+        return recordMapping_;
+    }
+
 public:
     void insert(InsertType insertMap);
 
-    SingleSelectResult select(FilterAndQuery filter);
+    std::unique_ptr<View> select(std::vector<std::string>& selectList, std::unique_ptr<filters::Filter> filter);
 
-    void del(FilterAndQuery filter);
+    void update(std::unique_ptr<filters::Filter> filter, InsertType newValues);
+
+    void del(std::unique_ptr<filters::Filter> filter);
 
 private:
     // Helpers
@@ -116,8 +135,6 @@ private:
     void createIndexes(std::shared_ptr<Record>);
 
 public:
-    void serialize(std::filesystem::path dataFilePath);
-    void deserialize(std::filesystem::path dataFilePath);
     void serializeCSV(std::filesystem::path dataFilePath);
     void deserializeCSV(std::filesystem::path dataFilePath);
 
@@ -134,7 +151,7 @@ private:
 
     // std::string parameter is a name of a field
     std::unordered_map<std::string, ColumnType> columnMap_;
-    std::unordered_map<std::string, size_t> recordMapping_;
+    RecordMappingT recordMapping_;
     std::unordered_map<std::string, OrderedIndex> orderedIndexes_;
 
     QueryType records_{};

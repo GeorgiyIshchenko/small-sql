@@ -1,8 +1,9 @@
 #include "Table.hpp"
 #include "Column.hpp"
+#include "DataBaseException.hpp"
 #include "Helpers.hpp"
+#include "Filter.hpp"
 
-#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -162,7 +163,30 @@ void db::Table::insertImpl(InsertType mappedRecord)
     records_.push_back(newRecord);
 
     // Make indexes
-    //createIndexes(shared);
+    // createIndexes(shared);
+}
+
+void printVal(db::Table::value_type val)
+{
+    if (std::holds_alternative<db::columns::Integer::value_type>(val))
+    {
+        std::cout << std::to_string(std::get<int>(val));
+    }
+    else if (std::holds_alternative<db::columns::Bool::value_type>(val))
+    {
+        std::cout << (std::get<db::columns::Bool::value_type>(val) ? "1" : "0");
+    }
+    else if (std::holds_alternative<db::columns::String::value_type>(val))
+    {
+        std::cout << std::get<db::columns::String::value_type>(val);
+    }
+    else if (std::holds_alternative<db::columns::Bytes::value_type>(val))
+    {
+        for (auto&& b : std::get<db::columns::Bytes::value_type>(val))
+        {
+            std::cout << b;
+        }
+    }
 }
 
 void db::Table::insert(InsertType mappedRecord)
@@ -172,19 +196,7 @@ void db::Table::insert(InsertType mappedRecord)
     for (auto&& [key, val] : mappedRecord)
     {
         std::cout << "{" << key << ", ";
-        if (std::holds_alternative<int>(val))
-        {
-            std::cout << "(int) " << std::to_string(std::get<int>(val));
-        }
-        else if (std::holds_alternative<bool>(val))
-        {
-            std::cout << "(bool) " << (std::get<bool>(val) ? "1" : "0");
-        }
-        else if (std::holds_alternative<std::string>(val))
-        {
-            std::cout << "(string) "
-                      << escapeCSVField(std::get<std::string>(val));
-        }
+        printVal(val);
         std::cout << "} ";
     }
     std::cout << std::endl;
@@ -195,74 +207,74 @@ void db::Table::insert(InsertType mappedRecord)
     insertImpl(mappedRecord);
 };
 
-db::Table::SingleSelectResult db::Table::select(FilterAndQuery filters)
+void db::Table::View::print()
 {
-    std::vector<ColumnType> selectedColumns;
-    std::for_each(filters.begin(), filters.end(),
-                  [&selectedColumns, this](auto&& filter)
-                  {
-                      auto it = columnMap_.find(filter.columnName_);
-                      if (it == columnMap_.end())
-                      {
-                          throw TableException("Select " + tableName_ +
-                                               ": there is no field " +
-                                               filter.columnName_ + "!");
-                      }
-                      selectedColumns.push_back(it->second);
-                  });
-
-    SingleSelectResult result{};
-
-    // if (orderedIndexes_.count(filter.columnName_))
-    // {
-    //     // TODO
-    // }
-    // else
-    // {
-    //     for (auto&& record : records_)
-    //     {
-    //         if (filter.lowerBound_ <
-    //                 record.rows[recordMapping_[filter.columnName_]].rowData
-    //                 &&
-    //             record.rows[recordMapping_[filter.columnName_]].rowData <=
-    //                 filter.upperBound_)
-    //         {
-    //             result.push_back(std::make_shared<Record>(record));
-    //         }
-    //     }
-    // }
-
-    return result;
-}
-
-void db::Table::del(FilterAndQuery filters)
-{
-    // NOTE: Should delete in filter function for perfomance
-    (void)filters;
-}
-
-void db::Table::serialize(std::filesystem::path dataFilePath)
-{
-    std::ofstream outputFile{ dataFilePath.native() };
-    if (outputFile.is_open())
+    std::cout << "Table #" +  tableName_ << std::endl;
+    for (auto&& [column, _] : recordMapping)
     {
-        outputFile << columns_.size(); // Number of columns
-        for (auto&& column : columns_)
-        {
-            columns::serialize(outputFile, column);
-        }
-        outputFile << static_cast<int>(
-            columns::ColumType::None); // We dont have zero column type, so zero
-                                       // is used as border
+        std::cout << column << " ";
+    }
+    std::cout << std::endl;
 
-        outputFile << records_.size(); // Size of our table
-        outputFile.close();
+    for (auto&& recordPtr : recordPtrs)
+    {
+        for (auto&& [column, pos] : recordMapping)
+        {
+            printVal(recordPtr->rows[pos].rowData);
+            std::cout << " ";
+        }
+        std::cout << std::endl;
     }
 }
 
-void db::Table::deserialize(std::filesystem::path dataFilePath)
+std::unique_ptr<db::Table::View> db::Table::select(std::vector<std::string>& selectList, std::unique_ptr<filters::Filter> filter)
 {
-    (void)dataFilePath;
+    RecordMappingT viewMapping{};
+    if (selectList.size()){
+        for (auto&& s: selectList){
+            viewMapping[s] = recordMapping_[s];
+        }
+    }
+    else{   
+        viewMapping = recordMapping_;
+    }
+    View result{ tableName_, columns_, viewMapping };
+    for (auto&& record : records_)
+    {
+        if (filter.get() == nullptr || filter->matches(record, *this))
+        {
+            result.recordPtrs.push_back(std::make_shared<Record>(record));
+        }
+    }
+    return std::make_unique<db::Table::View>(result);
+}
+
+void db::Table::update(std::unique_ptr<filters::Filter> filter,
+                       InsertType newValues)
+{
+    validateInsertion(newValues);
+    for (auto&& record : records_)
+    {
+        if (filter->matches(record, *this))
+        {
+            for (auto [key, val] : newValues)
+            {
+                if (columnMap_[key]->isUnique()){
+                    for(auto&& another: records_){
+                        if (another.rows[recordMapping_[key]].rowData == val){
+                            throw DatabaseException("Unique constraint failed in field " + key);
+                        }
+                    }
+                }
+                record.rows[recordMapping_[key]].rowData = val;
+            }
+        }
+    }
+}
+
+void db::Table::del(std::unique_ptr<filters::Filter> filter)
+{
+    records_.remove_if([&filter, this](auto&& record){ return filter->matches(record, *this); });
 }
 
 void db::Table::serializeCSV(std::filesystem::path dataFilePath)

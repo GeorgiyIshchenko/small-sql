@@ -2,141 +2,11 @@
 #include "Column.hpp"
 #include "DataBaseException.hpp"
 #include "Helpers.hpp"
-#include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <iostream>
 #include <optional>
 #include <sstream>
-
-void db::columns::serialize(std::ofstream& file,
-                            std::shared_ptr<BaseColumn> column)
-{
-    file << static_cast<int>(column->getColumnType());
-    // General info
-    file << column->name();
-    file << column->isIndex();
-    file << column->isUnique();
-    file << column->isKey();
-    file << column->hasDefault();
-    // Special for Integer
-    file << column->isAutoIncrement();
-    if (column->hasDefault())
-    {
-        file << column->getValueSize();
-        if (column->getColumnType() == columns::ColumType::Integer)
-        {
-            file << std::get<columns::Integer::value_type>(
-                column->defaultValue_.value());
-        }
-        else if (column->getColumnType() == columns::ColumType::Id)
-        {
-            file << std::get<columns::Id::value_type>(
-                column->defaultValue_.value());
-        }
-        else if (column->getColumnType() == columns::ColumType::Bool)
-        {
-            file << std::get<columns::Bool::value_type>(
-                column->defaultValue_.value());
-        }
-        else if (column->getColumnType() == columns::ColumType::Bytes)
-        {
-            auto bytes = std::get<columns::Bytes::value_type>(
-                column->defaultValue_.value());
-            std::for_each(bytes.begin(), bytes.end(),
-                          [&file](auto val) { file << val; });
-        }
-        else if (column->getColumnType() == columns::ColumType::String)
-        {
-            auto chars = std::get<columns::String::value_type>(
-                column->defaultValue_.value());
-            std::for_each(chars.begin(), chars.end(),
-                          [&file](auto val) { file << val; });
-        }
-    }
-}
-
-std::shared_ptr<db::columns::BaseColumn>
-db::columns::deserialize(std::ifstream& file)
-{
-    int intType;
-    file >> intType;
-    ColumType type = static_cast<ColumType>(intType);
-    if (type == ColumType::None)
-    {
-        return nullptr;
-    }
-    std::string name;
-    std::getline(file, name);
-    bool isIndex, isUnique, isKey, hasDefault, isAutoIncrement;
-    file >> isIndex;
-    file >> isUnique;
-    file >> isKey;
-    file >> hasDefault;
-    file >> isAutoIncrement;
-    std::optional<BaseColumn::value_type> defaultValue;
-    if (hasDefault)
-    {
-        size_t size;
-        file >> size;
-        if (type == columns::ColumType::Integer)
-        {
-            Integer::value_type buf;
-            file >> buf;
-            defaultValue = buf;
-        }
-        else if (type == columns::ColumType::Id)
-        {
-            Id::value_type buf;
-            file >> buf;
-            defaultValue = buf;
-        }
-        else if (type == columns::ColumType::Bool)
-        {
-            Bool::value_type buf;
-            file >> buf;
-            defaultValue = buf;
-        }
-        else if (type == columns::ColumType::Bytes)
-        {
-            Bytes::value_type vector{};
-            for (size_t _ = 0; _ < size; ++_)
-            {
-                Bytes::value_type::value_type buf;
-                file >> buf;
-                vector.push_back(buf);
-            }
-            defaultValue = vector;
-        }
-        else if (type == columns::ColumType::String)
-        {
-            String::value_type str{};
-            for (size_t _ = 0; _ < size; ++_)
-            {
-                String::value_type::value_type chr;
-                file >> chr;
-                str += chr;
-            }
-            defaultValue = str;
-        }
-    }
-    // TODO: !!!
-    if (type == columns::ColumType::Integer)
-    {
-    }
-    else if (type == columns::ColumType::Id)
-    {
-    }
-    else if (type == columns::ColumType::Bool)
-    {
-    }
-    else if (type == columns::ColumType::Bytes)
-    {
-    }
-    else if (type == columns::ColumType::String)
-    {
-    }
-    return {};
-}
 
 void db::columns::serializeCSV(std::ofstream& file,
                                std::shared_ptr<BaseColumn> column)
@@ -194,9 +64,9 @@ void db::columns::serializeCSV(std::ofstream& file,
         case ColumType::Bytes:
             defaultValueTypeStr = "bytes";
             // Convert bytes to hex string or base64 if needed
-            defaultValueStr =
-                std::string(std::get<std::vector<uint8_t>>(defaultValue).begin(),
-                            std::get<std::vector<uint8_t>>(defaultValue).end());
+            defaultValueStr = std::string(
+                std::get<std::vector<uint8_t>>(defaultValue).begin(),
+                std::get<std::vector<uint8_t>>(defaultValue).end());
             break;
         default:
             defaultValueTypeStr = "None";
@@ -304,7 +174,7 @@ db::columns::deserializeCSV(std::istringstream& file)
     }
 
     // Reconstruct defaultValue
-    std::optional<BaseColumn::value_type> defaultValue;
+    std::optional<BaseColumn::value_type> defaultValue{};
 
     if (defaultValuePresent)
     {
@@ -330,35 +200,38 @@ db::columns::deserializeCSV(std::istringstream& file)
             defaultValueType = ColumType::None;
         }
 
-        switch (defaultValueType)
+        if (defaultValueStr.size())
         {
-        case ColumType::Integer:
-        {
-            int val = std::stoi(defaultValueStr);
-            defaultValue = val;
-            break;
-        }
-        case ColumType::Bool:
-        {
-            bool val = defaultValueStr == "true";
-            defaultValue = val;
-            break;
-        }
-        case ColumType::String:
-        {
-            defaultValue = defaultValueStr;
-            break;
-        }
-        case ColumType::Bytes:
-        {
-            std::vector<uint8_t> bytes(defaultValueStr.begin(),
-                                    defaultValueStr.end());
-            defaultValue = bytes;
-            break;
-        }
-        default:
-            defaultValue = std::nullopt;
-            break;
+            switch (defaultValueType)
+            {
+            case ColumType::Integer:
+            {
+                Integer::value_type val = std::stoi(defaultValueStr);
+                defaultValue = val;
+                break;
+            }
+            case ColumType::Bool:
+            {
+                Bool::value_type val = defaultValueStr == "true";
+                defaultValue = val;
+                break;
+            }
+            case ColumType::String:
+            {
+                defaultValue = defaultValueStr;
+                break;
+            }
+            case ColumType::Bytes:
+            {
+                Bytes::value_type bytes(defaultValueStr.begin(),
+                                        defaultValueStr.end());
+                defaultValue = bytes;
+                break;
+            }
+            default:
+                defaultValue = std::nullopt;
+                break;
+            }
         }
     }
 
@@ -368,9 +241,10 @@ db::columns::deserializeCSV(std::istringstream& file)
     if (colType == ColumType::Integer)
     {
         bool autoIncrement = additionalFieldStr == "1";
-        int defaultIntValue = defaultValuePresent && defaultValue.has_value()
-                                  ? std::get<int>(defaultValue.value())
-                                  : 0;
+        int defaultIntValue =
+            defaultValuePresent && defaultValue.has_value()
+                ? std::get<Integer::value_type>(defaultValue.value())
+                : 0;
         column = std::make_shared<Integer>(name, defaultIntValue, index, unique,
                                            key, autoIncrement);
     }
@@ -380,18 +254,19 @@ db::columns::deserializeCSV(std::istringstream& file)
     }
     else if (colType == ColumType::Bool)
     {
-        bool defaultBoolValue = defaultValuePresent && defaultValue.has_value()
-                                    ? std::get<bool>(defaultValue.value())
-                                    : false;
+        bool defaultBoolValue =
+            defaultValuePresent && defaultValue.has_value()
+                ? std::get<Bool::value_type>(defaultValue.value())
+                : false;
         column =
             std::make_shared<Bool>(name, defaultBoolValue, index, unique, key);
     }
     else if (colType == ColumType::String)
     {
         size_t maxLen = std::stoull(additionalFieldStr);
-        std::string defaultStringValue =
+        String::value_type defaultStringValue =
             defaultValuePresent && defaultValue.has_value()
-                ? std::get<std::string>(defaultValue.value())
+                ? std::get<String::value_type>(defaultValue.value())
                 : "";
         column = std::make_shared<String>(name, maxLen, defaultStringValue,
                                           index, unique, key);
@@ -399,10 +274,10 @@ db::columns::deserializeCSV(std::istringstream& file)
     else if (colType == ColumType::Bytes)
     {
         size_t maxLen = std::stoull(additionalFieldStr);
-        std::vector<uint8_t> defaultBytesValue =
+        Bytes::value_type defaultBytesValue =
             defaultValuePresent && defaultValue.has_value()
-                ? std::get<std::vector<uint8_t>>(defaultValue.value())
-                : std::vector<uint8_t>();
+                ? std::get<Bytes::value_type>(defaultValue.value())
+                : Bytes::value_type();
         column = std::make_shared<Bytes>(name, maxLen, defaultBytesValue, index,
                                          unique, key);
     }

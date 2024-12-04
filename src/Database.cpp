@@ -7,7 +7,7 @@
 namespace db
 {
 
-void Database::createTable(std::string name,
+void Database::createTable(std::string& name,
                            std::vector<Table::ColumnType> columns)
 {
 #ifdef DEBUG
@@ -19,7 +19,7 @@ void Database::createTable(std::string name,
 #endif
 }
 
-void Database::insert(std::string tableName, Table::InsertType insertMap)
+void Database::insert(std::string& tableName, Table::InsertType insertMap)
 {
 #ifdef DEBUG
     std::cout << "Inserting data to table: " + tableName << std::endl;
@@ -28,6 +28,18 @@ void Database::insert(std::string tableName, Table::InsertType insertMap)
 #ifdef DEBUG
     std::cout << "Successfully inserted data to table: " + tableName << std::endl;
 #endif
+}
+
+std::unique_ptr<Table::View> Database::select(std::string& tableName, std::vector<std::string>& selectList, std::unique_ptr<filters::Filter> filter){
+    return tables_[tableName]->select(selectList, std::move(filter));
+}
+
+void Database::update(std::string& tableName, std::unique_ptr<filters::Filter> filter, Table::InsertType newValues){
+    tables_[tableName]->update(std::move(filter), std::move(newValues));
+}
+
+void Database::del(std::string& tableName, std::unique_ptr<filters::Filter> filter){
+    tables_[tableName]->del(std::move(filter));
 }
 
 void Database::execute(std::string request)
