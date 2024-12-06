@@ -350,7 +350,6 @@ std::unique_ptr<commands::Update> Parser::parseUpdate()
     // table name
     expect(lexer::TOK_IDENTIFIER);
     std::string tableName = previousToken_.lexeme;
-    advance();
 
     expect(lexer::TOK_SET);
 
@@ -369,6 +368,12 @@ std::unique_ptr<commands::Update> Parser::parseUpdate()
     auto command = std::make_unique<commands::Update>(
         tableName, std::move(whereCondition), assignments);
 
+#ifdef DEBUG
+    std::cout << "// Parsing update to table " + tableName +
+                     " command is ended!"
+              << std::endl;
+#endif
+
     return command;
 }
 
@@ -379,7 +384,6 @@ std::unique_ptr<commands::Delete> Parser::parseDelete()
     // Table name
     expect(lexer::TOK_IDENTIFIER);
     std::string tableName = previousToken_.lexeme;
-    advance();
 
     // where
     std::unique_ptr<filters::Filter> whereCondition = nullptr;
@@ -391,6 +395,12 @@ std::unique_ptr<commands::Delete> Parser::parseDelete()
     // Create and return the command object
     auto command = std::make_unique<commands::Delete>(
         tableName, std::move(whereCondition));
+
+#ifdef DEBUG
+    std::cout << "// Parsing delete to table " + tableName +
+                     " command is ended!"
+              << std::endl;
+#endif
 
     return command;
 }

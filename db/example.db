@@ -8,5 +8,5 @@ Id,id,1,int,0,1,1,1,1
 #DATA
 login,password_hash,is_admin,id
 gosha,0xdeadbeefdeadbeef,true,0,
-gosha_vtoroy,0xbeefdead,false,1,
+gosha_vtoroy,0xbeefdead,true,1,
 gosha_treriy,0xbeefdead,false,2,

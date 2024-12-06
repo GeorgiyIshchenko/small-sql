@@ -274,11 +274,15 @@ db::columns::deserializeCSV(std::istringstream& file)
     else if (colType == ColumType::Bytes)
     {
         size_t maxLen = std::stoull(additionalFieldStr);
-        Bytes::value_type defaultBytesValue =
+        std::string defaultBytesValue =
             defaultValuePresent && defaultValue.has_value()
-                ? std::get<Bytes::value_type>(defaultValue.value())
-                : Bytes::value_type();
-        column = std::make_shared<Bytes>(name, maxLen, defaultBytesValue, index,
+                ? std::get<std::string>(defaultValue.value())
+                : std::string{};
+        Bytes::value_type result{};
+        for(auto&& i: defaultBytesValue){
+            result.push_back(static_cast<Bytes::value_type::value_type>(i));
+        }
+        column = std::make_shared<Bytes>(name, maxLen, result, index,
                                          unique, key);
     }
     else

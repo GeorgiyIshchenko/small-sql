@@ -1,8 +1,8 @@
 #include "Table.hpp"
 #include "Column.hpp"
 #include "DataBaseException.hpp"
-#include "Helpers.hpp"
 #include "Filter.hpp"
+#include "Helpers.hpp"
 
 #include <filesystem>
 #include <fstream>
@@ -209,7 +209,7 @@ void db::Table::insert(InsertType mappedRecord)
 
 void db::Table::View::print()
 {
-    std::cout << "Table #" +  tableName_ << std::endl;
+    std::cout << "Table #" + tableName_ << std::endl;
     for (auto&& [column, _] : recordMapping)
     {
         std::cout << column << " ";
@@ -227,15 +227,20 @@ void db::Table::View::print()
     }
 }
 
-std::unique_ptr<db::Table::View> db::Table::select(std::vector<std::string>& selectList, std::unique_ptr<filters::Filter> filter)
+std::unique_ptr<db::Table::View>
+db::Table::select(std::vector<std::string>& selectList,
+                  std::unique_ptr<filters::Filter> filter)
 {
     RecordMappingT viewMapping{};
-    if (selectList.size()){
-        for (auto&& s: selectList){
+    if (selectList.size())
+    {
+        for (auto&& s : selectList)
+        {
             viewMapping[s] = recordMapping_[s];
         }
     }
-    else{   
+    else
+    {
         viewMapping = recordMapping_;
     }
     View result{ tableName_, columns_, viewMapping };
@@ -259,10 +264,14 @@ void db::Table::update(std::unique_ptr<filters::Filter> filter,
         {
             for (auto [key, val] : newValues)
             {
-                if (columnMap_[key]->isUnique()){
-                    for(auto&& another: records_){
-                        if (another.rows[recordMapping_[key]].rowData == val){
-                            throw DatabaseException("Unique constraint failed in field " + key);
+                if (columnMap_[key]->isUnique())
+                {
+                    for (auto&& another : records_)
+                    {
+                        if (another.rows[recordMapping_[key]].rowData == val)
+                        {
+                            throw DatabaseException(
+                                "Unique constraint failed in field " + key);
                         }
                     }
                 }
@@ -274,7 +283,19 @@ void db::Table::update(std::unique_ptr<filters::Filter> filter,
 
 void db::Table::del(std::unique_ptr<filters::Filter> filter)
 {
-    records_.remove_if([&filter, this](auto&& record){ return filter->matches(record, *this); });
+    std::cout << "XUI" << std::endl;
+    for (auto b = records_.begin(); b != records_.end();)
+    {
+        if (filter.get() == nullptr || filter->matches(*b, *this))
+        {
+            std::cout << "XUI2" << std::endl;
+            b = records_.erase(b);
+            std::cout << "XUI3" << std::endl;
+        }
+        else {
+            b++;
+        }
+    }
 }
 
 void db::Table::serializeCSV(std::filesystem::path dataFilePath)

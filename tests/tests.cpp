@@ -34,14 +34,22 @@ TEST(Operation, Complex)
 
     db::Database::getInstance().execute("SELECT id, login FROM users");
 
-    db::Database::getInstance().execute("SELECT id, login FROM users where id = 1");
+    db::Database::getInstance().execute(
+        "SELECT id, login FROM users where id = 1");
+
+    db::Database::getInstance().execute("SELECT * FROM users where id = 1 + 1");
+
+    db::Database::getInstance().execute(
+        "SELECT id, login FROM users where id <= 1");
+
+    db::Database::getInstance().execute(
+        "update users set is_admin = true where id = 1");
+
+    db::Database::getInstance().execute(
+        "insert (login = \"to_delete\", password_hash = 0xbeefdead, "
+        "is_admin = false) to users");
+
+    db::Database::getInstance().execute("delete users where login = to_delete");
 
     db::Database::getInstance().storeTableInFile("users", dbPath);
-}
-
-TEST(Operation, Select)
-{
-
-    db::Database::getInstance().loadTableFromFile("users", dbPath);
-
 }
