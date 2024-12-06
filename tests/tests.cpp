@@ -5,13 +5,13 @@
 
 #include <filesystem>
 
-const std::filesystem::path dbPath{ "../db/example.db" };
+const std::filesystem::path exampleDbPath{ "../db/example.db" };
 
 TEST(Operation, Complex)
 {
 
 #ifdef DEBUG
-    std::cout << "db path: " << std::filesystem::absolute(dbPath) << std::endl;
+    std::cout << "db path: " << std::filesystem::absolute(exampleDbPath) << std::endl;
 #endif
 
     db::Database::getInstance().execute(
@@ -51,5 +51,13 @@ TEST(Operation, Complex)
 
     db::Database::getInstance().execute("delete users where login = to_delete");
 
-    db::Database::getInstance().storeTableInFile("users", dbPath);
+    db::Database::getInstance().storeTableInFile("users", exampleDbPath);
+}
+
+TEST(Operation, LoadStore){
+
+    EXPECT_NO_THROW(db::Database::getInstance().loadTableFromFile("users", exampleDbPath));
+
+    EXPECT_NO_THROW(db::Database::getInstance().storeTableInFile("users", std::filesystem::path{"../db/example_copy.db"}));
+
 }

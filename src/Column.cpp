@@ -174,7 +174,7 @@ db::columns::deserializeCSV(std::istringstream& file)
     }
 
     // Reconstruct defaultValue
-    std::optional<BaseColumn::value_type> defaultValue{};
+    std::optional<BaseColumn::value_type> defaultValue;
 
     if (defaultValuePresent)
     {
@@ -206,14 +206,12 @@ db::columns::deserializeCSV(std::istringstream& file)
             {
             case ColumType::Integer:
             {
-                Integer::value_type val = std::stoi(defaultValueStr);
-                defaultValue = val;
+                defaultValue = static_cast<Integer::value_type>(std::stoi(defaultValueStr));
                 break;
             }
             case ColumType::Bool:
             {
-                Bool::value_type val = defaultValueStr == "true";
-                defaultValue = val;
+                defaultValue = defaultValueStr == "true";
                 break;
             }
             case ColumType::String:
@@ -223,7 +221,7 @@ db::columns::deserializeCSV(std::istringstream& file)
             }
             case ColumType::Bytes:
             {
-                Bytes::value_type bytes(defaultValueStr.begin(),
+                std::string bytes(defaultValueStr.begin(),
                                         defaultValueStr.end());
                 defaultValue = bytes;
                 break;
@@ -267,15 +265,15 @@ db::columns::deserializeCSV(std::istringstream& file)
         String::value_type defaultStringValue =
             defaultValuePresent && defaultValue.has_value()
                 ? std::get<String::value_type>(defaultValue.value())
-                : "";
+                : std::string{};
         column = std::make_shared<String>(name, maxLen, defaultStringValue,
                                           index, unique, key);
     }
     else if (colType == ColumType::Bytes)
     {
         size_t maxLen = std::stoull(additionalFieldStr);
-        std::string defaultBytesValue =
-            defaultValuePresent && defaultValue.has_value()
+        auto defaultBytesValue =
+            (defaultValuePresent && defaultValue.has_value())
                 ? std::get<std::string>(defaultValue.value())
                 : std::string{};
         Bytes::value_type result{};

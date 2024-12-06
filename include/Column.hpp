@@ -190,7 +190,7 @@ public:
 
     ColumType getColumnType() const override
     {
-        return ColumType::Integer;
+        return ColumType::Bool;
     }
 
     size_t getValueSize() override
