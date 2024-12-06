@@ -441,7 +441,6 @@ void db::Table::deserializeCSV(std::filesystem::path dataFilePath)
         throw TableException("No header row found in CSV data.");
     }
     std::vector<std::string> columnNames = parseCSVLine(line);
-    std::cout << columnNames.size() << " " << columns_.size() << std::endl;
     if (columnNames.size() != columns_.size())
     {
         throw TableException(
@@ -458,10 +457,6 @@ void db::Table::deserializeCSV(std::filesystem::path dataFilePath)
     while (std::getline(file, line))
     {
         std::vector<std::string> fieldValues = parseCSVLine(line);
-        std::cout << fieldValues.size() << " " << columns_.size() << std::endl;
-        for (auto&& i: fieldValues){
-            std::cout << i << std::endl;
-        }
         if (fieldValues.size() != columns_.size())
         {
             throw TableException(

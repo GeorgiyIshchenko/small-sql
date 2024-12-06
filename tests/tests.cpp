@@ -39,6 +39,8 @@ TEST(Operation, Complex)
 
     db::Database::getInstance().execute("SELECT * FROM users where id = 1 + 1");
 
+    db::Database::getInstance().execute("SELECT * FROM users where login = gosha");
+
     db::Database::getInstance().execute(
         "SELECT id, login FROM users where id <= 1");
 
